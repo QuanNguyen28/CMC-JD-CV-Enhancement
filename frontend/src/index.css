@@ -1,0 +1,27 @@
+/* src/index.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global styles */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  @apply bg-gray-50 text-gray-800;
+}
+
+#root {
+  @apply flex flex-col items-center justify-start min-h-screen;
+}
+
+/* Input and button resets */
+input, button {
+  font-family: inherit;
+}
+
+/* Additional utility classes or custom styles can go here */

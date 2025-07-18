@@ -1,0 +1,14 @@
+{{ metadata.title }} Interview Questions
+(Level: {{ metadata.level }}, Department: {{ metadata.department }})
+
+Context Chunks:
+{% for c in chunks %}
+- {{ c }}
+{% endfor %}
+
+Based on the above description, generate:
+1. **5 technical questions** that assess core skills.
+2. **3 behavioral questions** that probe communication and teamwork.
+3. **2 scenario-based questions** relevant to the role.
+
+Format as a numbered list, grouping by question type.

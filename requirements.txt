@@ -1,0 +1,11 @@
+python-dotenv
+google-cloud-aiplatform
+minio
+pymilvus
+psycopg2-binary
+tqdm
+fastapi
+uvicorn
+sentence-transformers
+python-dotenv
+google-cloud-aiplatform
