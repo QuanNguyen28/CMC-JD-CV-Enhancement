@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS candidate_profiles (
   full_name        TEXT NOT NULL,
   email            VARCHAR(255) UNIQUE NOT NULL,
   phone            VARCHAR(50),
-  resume_text      TEXT NOT NULL,        -- Parsed plain text of resume
+  resume_text      TEXT NOT NULL,        
   created_at       TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

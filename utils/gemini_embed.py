@@ -46,5 +46,3 @@ def embed_text(chunks: list[str], model=EMBED_MODEL, task_type="RETRIEVAL_DOCUME
     except Exception as e:
         print(f"❌ An error occurred during the Gemini API call: {e}")
         raise
-
-

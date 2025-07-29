@@ -1,11 +1,50 @@
-python-dotenv
-google-cloud-aiplatform
-minio
-pymilvus
-psycopg2-binary
-tqdm
-fastapi
-uvicorn
-sentence-transformers
-python-dotenv
-google-cloud-aiplatform
+# requirements.txt for JD & CV Enhancement Project
+
+# Web framework
+fastapi==0.95.2
+uvicorn[standard]==0.23.2
+
+# Data models & env
+pydantic==1.10.12
+python-dotenv==1.0.0
+
+# Database clients
+psycopg2-binary==2.9.7
+
+# Object storage
+minio==7.1.15
+
+# Vector store
+pymilvus==2.2.9
+
+# HTTP & utilities
+requests==2.31.0
+tqdm==4.65.0
+
+# Authentication & security
+passlib[bcrypt]==1.7.4
+python-jose==3.3.0
+
+# Templating
+jinja2==3.1.2
+
+# Markdown frontmatter
+python-frontmatter==1.0.0
+
+# (Optional) type hints (let pip resolve the version)
+# typing-extensions
+
+# PDF, DOCX, Image extraction
+PyPDF2==3.0.1
+python-docx==1.2.0
+pillow==11.3.0
+pytesseract==0.3.10
+
+# Google Gemini SDK
+google-generativeai==0.8.5
+
+# For development
+ipython
+
+# Environment variable helper (for pymilvus)
+environs==9.5.0
