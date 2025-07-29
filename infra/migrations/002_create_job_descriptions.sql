@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
   level           VARCHAR(20),
   employment_type VARCHAR(20),
   location        TEXT,
-  content_md      TEXT NOT NULL,         -- Markdown content
+  content_md      TEXT NOT NULL,        
   version         INT NOT NULL DEFAULT 1,
   created_by      VARCHAR(50),
   created_at      TIMESTAMP NOT NULL DEFAULT NOW()

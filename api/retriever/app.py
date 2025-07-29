@@ -5,17 +5,23 @@ retriever/app.py
 FastAPI semantic retriever using Milvus for vector search and Gemini for query embeddings.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 import sys
 
-# Add the parent directory to the path to import utils
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from pymilvus import connections, Collection
 from utils.gemini_embed import embed_text  
+from api.auth.auth import router as auth_router
+from api.auth.auth import require_roles
+
+app = FastAPI(title="JD Retriever")
+
+# Mount auth routes under /auth
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 load_dotenv()
 
@@ -30,8 +36,6 @@ collection = Collection(MILVUS_COLLECTION)
 # Load collection into memory for search operations
 collection.load()
 
-app = FastAPI(title="JD Retriever")
-
 class RetrieveRequest(BaseModel):
     query: str
     top_k: int = 5
@@ -43,7 +47,7 @@ class ChunkResult(BaseModel):
     object_url: str
     score: float
 
-@app.post("/retrieve", response_model=list[ChunkResult])
+@app.post("/retrieve", response_model=list[ChunkResult], dependencies=[Depends(require_roles("recruiter","manager","admin"))])
 def retrieve(req: RetrieveRequest):
     try:
         # Embed the query using Gemini
@@ -55,7 +59,7 @@ def retrieve(req: RetrieveRequest):
         
         # Search in Milvus using COSINE similarity
         search_params = {
-            "metric_type": "COSINE",  # Use COSINE similarity for text embeddings
+            "metric_type": "COSINE",  
             "params": {"nprobe": 50}
         }
         
@@ -81,7 +85,7 @@ def retrieve(req: RetrieveRequest):
                 jd_id=hit.entity.get("jd_id"),
                 chunk_index=hit.entity.get("chunk_index"),
                 object_url=hit.entity.get("object_url"),
-                score=hit.score  # Milvus returns similarity score
+                score=hit.score  
             ))
         
         return out

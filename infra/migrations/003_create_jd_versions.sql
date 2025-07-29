@@ -8,10 +8,10 @@ CREATE TABLE IF NOT EXISTS jd_versions (
                    ON UPDATE CASCADE
                    ON DELETE CASCADE,
   version_number  INT NOT NULL,
-  content_md      TEXT NOT NULL,             -- Markdown content at this version
-  edited_by       VARCHAR(50) NOT NULL,      -- Username who made the change
+  content_md      TEXT NOT NULL,
+  edited_by       VARCHAR(50) NOT NULL,
   edited_at       TIMESTAMP NOT NULL
-                   DEFAULT NOW(),           -- When the change was made
+                   DEFAULT NOW(),          
   change_summary  TEXT,                     
   UNIQUE (jd_id, version_number)
 );
