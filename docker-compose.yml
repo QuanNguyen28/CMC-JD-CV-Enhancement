@@ -48,8 +48,8 @@ services:
     platform: linux/amd64
     command: ["milvus", "run", "standalone"]
     ports:
-      - "19530:19530"   # gRPC
-      - "9091:9091"     # REST
+      - "19530:19530"   
+      - "9091:9091"     
     environment:
       TZ: UTC
       ETCD_ENDPOINTS: etcd:2379
