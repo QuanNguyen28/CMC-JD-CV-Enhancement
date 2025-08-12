@@ -22,7 +22,11 @@ services:
       - ETCD_AUTO_COMPACTION_MODE=revision
       - ETCD_AUTO_COMPACTION_RETENTION=1000
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    command: >
+      etcd
+      --advertise-client-urls=http://etcd:2379
+      --listen-client-urls=http://0.0.0.0:2379
+      --data-dir=/etcd
     volumes:
       - etcd_data:/etcd
 
@@ -36,8 +40,8 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     platform: linux/amd64
     ports:
-      - "9000:9000"  # API
-      - "9001:9001"  # Web Console UI
+      - "9000:9000" 
+      - "9001:9001"  
     volumes:
       - minio_data:/data
 

@@ -1,48 +1,89 @@
+# src/embeddings/utils/gemini_embed.py
+from __future__ import annotations
+from typing import List
+import math
 
-import os
 import google.generativeai as genai
-from dotenv import load_dotenv
 
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-env_path = os.path.join(root_dir, '.env')
-load_dotenv(env_path)
+from src.core.config import (
+    GEMINI_API_KEY,
+    GEMINI_EMBED_MODEL,
+    VECTOR_DIM,
+)
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
-
-# In thông tin debug để kiểm tra
-print(f"DEBUG: .env path = {env_path}")
-if API_KEY:
-    print(f"DEBUG: API_KEY loaded: Yes (starts with {API_KEY[:5]}..., ends with ...{API_KEY[-4:]})")
+# Cấu hình Gemini 1 lần từ config.py
+if not GEMINI_API_KEY:
+    # Chủ động cảnh báo, để dev biết cấu hình chưa đúng
+    print("⚠️  GEMINI_API_KEY is not set. Embedding will fail if called.")
 else:
-    print(f"DEBUG: API_KEY loaded: No")
-print(f"DEBUG: EMBED_MODEL = {EMBED_MODEL}")
+    genai.configure(api_key=GEMINI_API_KEY)
 
-# Cấu hình genai với API key
-if API_KEY:
-    genai.configure(api_key=API_KEY)
-else:
-    print("⚠️ WARNING: GEMINI_API_KEY is not set. The embedding function will fail.")
 
-def embed_text(chunks: list[str], model=EMBED_MODEL, task_type="RETRIEVAL_DOCUMENT") -> list[list[float]]:
+def _l2_norm(v: List[float]) -> float:
+    return math.sqrt(sum(float(x) * float(x) for x in v)) or 1.0
+
+
+def _unit_normalize(v: List[float]) -> List[float]:
+    n = _l2_norm(v)
+    return [float(x) / n for x in v]
+
+
+def _fix_dim(vec: List[float], dim: int) -> List[float]:
     """
-    Embeds a batch of text chunks using the Gemini API.
-    This function will raise an exception if the API call fails.
+    Đề phòng model thay đổi kích thước: cắt/pad về đúng VECTOR_DIM.
+    (Sau đó normalize lại để dùng COSINE ổn định.)
     """
-    if not API_KEY:
-        raise ValueError("Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.")
+    if len(vec) == dim:
+        return vec
+    if len(vec) > dim:
+        return vec[:dim]
+    return vec + [0.0] * (dim - len(vec))
+
+
+def embed_text(
+    chunks: List[str],
+    model: str = GEMINI_EMBED_MODEL,
+    task_type: str = "RETRIEVAL_DOCUMENT",
+) -> List[List[float]]:
+    """
+    Embed danh sách đoạn văn bản bằng Gemini.
+    - Trả về list vector đã FIX_DIM + UNIT-NORMALIZE (phù hợp search COSINE).
+    - Giữ API và log tương tự style bạn gửi.
+    """
+    if not GEMINI_API_KEY:
+        raise ValueError("Gemini API key is not configured. Set GEMINI_API_KEY in your environment.")
 
     print(f"INFO: Embedding {len(chunks)} chunks using model '{model}'...")
     try:
-        result = genai.embed_content(
-            model=model,
-            content=chunks,
-            task_type=task_type
-        )
-        
-        print(f"✅ Successfully generated {len(result['embedding'])} embeddings.")
-        return result['embedding']
+        embeddings: List[List[float]] = []
+
+        # Thư viện google.generativeai hiện ổn định cho embed từng content một.
+        # (Một số version hỗ trợ batch nhưng không nhất quán -> iterate an toàn.)
+        for i, text in enumerate(chunks):
+            resp = genai.embed_content(
+                model=model,
+                content=text or "",
+                task_type=task_type,
+            )
+            vec = resp["embedding"]
+            vec = _unit_normalize(_fix_dim(vec, VECTOR_DIM))
+            embeddings.append(vec)
+
+        print(f"✅ Successfully generated {len(embeddings)} embeddings.")
+        return embeddings
 
     except Exception as e:
         print(f"❌ An error occurred during the Gemini API call: {e}")
         raise
+
+
+def embed_query(
+    query: str,
+    model: str = GEMINI_EMBED_MODEL,
+    task_type: str = "RETRIEVAL_QUERY",
+) -> List[float]:
+    """
+    Tiện ích embed cho 1 query (unit-normalized).
+    """
+    [vec] = embed_text([query], model=model, task_type=task_type)
+    return vec

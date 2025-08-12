@@ -1,20 +1,22 @@
 # src/services/__init__.py
 """
-Services package initializer
-"""
-from .access_control_service   import AccessControlService
-from .llm_prompt_orchestrator import generate_jd_text, improve_jd_text
-from .jd_versioning_service   import record_jd_version, get_versions, update_jd
-from .export_bridge           import export_jd_file   # dùng bridge, không import từ jd_versioning_service
-from .question_generator       import QuestionGenerator
-from .retriever_service        import RetrieverService
-from .role_taxonomy_mapper     import RoleTaxonomyMapper
+SmartHire Composer - services package.
 
-__all__ = [
-    "AccessControlService",
-    "generate_jd_text", "improve_jd_text",
-    "record_jd_version", "get_versions", "update_jd", "export_jd_file",
-    "QuestionGenerator",
-    "RetrieverService",
-    "RoleTaxonomyMapper",
-]
+⚠️ Tránh import các module con tại đây để không tạo circular import.
+Hãy import trực tiếp ở nơi sử dụng, ví dụ:
+  - from src.services.access_control_service import AccessControlService
+  - from src.services.jd_versioning_service import record_jd_version, get_versions, update_jd
+  - from src.services.export_bridge import export_jd_file
+  - from src.services.llm_prompt_orchestrator import generate_jd_text, improve_jd_text
+"""
+
+from typing import TYPE_CHECKING
+
+# Chỉ để IDE/type check; KHÔNG import thật khi chạy runtime
+if TYPE_CHECKING:
+    from .access_control_service import AccessControlService
+    from .jd_versioning_service import record_jd_version, get_versions, update_jd
+    from .export_bridge import export_jd_file
+    from .llm_prompt_orchestrator import generate_jd_text, improve_jd_text
+
+__all__: list[str] = []  # không re-export để tránh side effects

@@ -1,14 +1,54 @@
-{{ metadata.title }} Interview Questions
-(Level: {{ metadata.level }}, Department: {{ metadata.department }})
+You are an expert interview question designer.
 
-Context Chunks:
-{% for c in chunks %}
-- {{ c }}
-{% endfor %}
+Goal:
+Generate exactly {{ count }} interview questions in {{ "English" if language|lower == "en" else "Vietnamese" }} for the role:
+- Title: {{ title }}
+- Level: {{ level }}
+- Department: {{ department }}
+- Focus areas: {% if focus and focus|length > 0 %}{{ focus | join(", ") }}{% else %}(none provided){% endif %}
 
-Based on the above description, generate:
-1. **5 technical questions** that assess core skills.
-2. **3 behavioral questions** that probe communication and teamwork.
-3. **2 scenario-based questions** relevant to the role.
+If job description text is provided below, use it to tailor the questions (skills, responsibilities, tech stack, domain). If not, rely on the title/level/department/focus.
 
-Format as a numbered list, grouping by question type.
+=== Job Description (Markdown) ===
+{% if jd_markdown and jd_markdown|length > 0 %}
+{{ jd_markdown }}
+{% else %}
+(No JD content provided)
+{% endif %}
+=== End JD ===
+
+Requirements:
+1) Output must be STRICT JSON (no extra text, no markdown fences, no comments).
+2) Produce exactly {{ count }} questions.
+3) Use only these types (balanced across the set if possible): {{ mix | join(", ") }}.
+4) Keep questions concrete, role-appropriate, and assess real competencies.
+5) Difficulty should reflect the level: use one of ["junior","mid","senior"] (lowercase).
+6) For "competency", prefer a specific area (e.g., a focus item like "{{ focus[0] if focus else "system design" }}"), or a clear capability (e.g., "communication", "incident response", "problem solving").
+7) Provide a short rubric for each question: what good answers should include (key points, trade-offs, structure like STAR, success criteria).
+8) Do not include placeholders like "..." in the output; write fully formed questions.
+
+Output JSON schema (return ONLY this JSON object):
+{
+  "questions": [
+    {
+      "type": "technical | behavioral | situational",
+      "question": "string",
+      "competency": "string",
+      "difficulty": "junior | mid | senior",
+      "rubric": "string"
+    }
+  ]
+}
+
+Constraints:
+- "type" must be one of: {{ mix | map('lower') | list | join(", ") }}.
+- "difficulty" must be exactly one of: "junior", "mid", "senior".
+- Write all "question" and "rubric" text in {{ "English" if language|lower == "en" else "Vietnamese" }}.
+- Return ONLY the JSON object. No preface, no code blocks, no extra lines.
+
+Quality hints:
+- Technical: probe architecture choices, scaling, reliability, correctness, testing/observability; ask for trade-offs and constraints relevant to {{ title }} ({{ level }}) in {{ department }}.
+- Behavioral: ask for real past experiences (STAR), conflict resolution, communication under pressure, ownership, collaboration.
+- Situational: “what would you do if…?” scenarios tied to the JD context and focus (e.g., {% if focus and focus|length>0 %}{{ focus[0] }}{% else %}system design{% endif %}), including ambiguity, incidents, security, or product changes.
+
+Return the JSON now.
