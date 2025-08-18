@@ -25,6 +25,9 @@ import logging
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Iterable, Tuple, TypedDict
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNotFound
 

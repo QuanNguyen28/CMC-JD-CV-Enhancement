@@ -1,5 +1,8 @@
 # src/services/jd_versioning_service.py
 from datetime import datetime
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy.orm import Session
 
 from src.db.models import JobDescription as JDModel, JDVersion as VerModel

@@ -10,9 +10,10 @@ ALGORITHM = "HS256"
 # — PostgreSQL configuration —
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
-DB_NAME = os.getenv("DB_NAME", "jd_library")
+DB_NAME = os.getenv("DB_NAME", "hcm")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
+DB_SCHEMA = os.getenv("DB_SCHEMA", "public")  # <— thêm dòng này
 
 # Compose SQLAlchemy Database URL
 DATABASE_URL = (
@@ -31,14 +32,17 @@ GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
 # — Local embedding fallback —
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
-# — MinIO configuration —
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-MINIO_BUCKET = os.getenv("MINIO_BUCKET", "jdchunks")
+# # — MinIO configuration —
+# MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+# MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+# MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+# MINIO_BUCKET = os.getenv("MINIO_BUCKET", "jdchunks")
 
 # — Milvus configuration —
 MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
 MILVUS_PORT = int(os.getenv("MILVUS_PORT", "19530"))
 MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "jdchunks")
 VECTOR_DIM = int(os.getenv("VECTOR_DIM", "768"))
+
+# — Local chunk storage (replaces MinIO) —
+CHUNK_LOCAL_DIR = os.getenv("CHUNK_LOCAL_DIR", "data/chunks")

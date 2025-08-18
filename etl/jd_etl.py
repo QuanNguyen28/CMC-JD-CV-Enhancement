@@ -1,149 +1,216 @@
 # etl/jd_etl.py
-#!/usr/bin/env python
-"""
-ETL script to load Job Descriptions from Markdown files into PostgreSQL
-Tables: job_families, jd_taxonomy_tags, job_descriptions, jd_tag_map
-"""
+from __future__ import annotations
 import os
-import glob
 import sys
-from dotenv import load_dotenv
-load_dotenv()
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pathlib import Path
+from typing import Optional, List
+from datetime import datetime
 
-# adjust path to import src modules
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+from sqlalchemy.orm import Session
+from sqlalchemy import delete
 
-import frontmatter
-import psycopg2
-from src.core.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+# Bảo đảm import được "src" khi chạy file trực tiếp
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-def main():
-    conn = psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS
+from src.db.session import SessionLocal
+from src.db.models import JobDescription, JobFamily, JDVersion, JDTag, JDTagMap
+from etl.utils import list_md_files, read_text, parse_front_matter, slugify
+
+# Thư mục chứa JD mẫu (.md) — mặc định: etl/jd_markdown cạnh repo
+DEFAULT_JD_DIR = PROJECT_ROOT / "etl" / "jd_markdown"
+JD_DIR = os.getenv("JD_ETL_DIR", str(DEFAULT_JD_DIR))
+
+
+# ----------------- Helpers DB -----------------
+def get_or_create_family(db: Session, family_name: Optional[str]) -> Optional[int]:
+    if not family_name:
+        return None
+    row = db.query(JobFamily).filter(JobFamily.name == family_name).first()
+    if row:
+        return row.family_id
+    row = JobFamily(name=family_name, description=None)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row.family_id
+
+
+def get_or_create_tag(db: Session, tag_name: str) -> int:
+    t = db.query(JDTag).filter(JDTag.tag_name == tag_name).first()
+    if t:
+        return t.tag_id
+    t = JDTag(tag_name=tag_name, description=None, parent_tag_id=None)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t.tag_id
+
+
+def replace_tag_map(db: Session, jd_id: int, tags: List[str]) -> None:
+    db.execute(delete(JDTagMap).where(JDTagMap.jd_id == jd_id))
+    db.commit()
+    for name in tags:
+        tag_id = get_or_create_tag(db, name)
+        db.add(JDTagMap(jd_id=jd_id, tag_id=tag_id))
+    db.commit()
+
+
+def insert_version(
+    db: Session,
+    jd_id: int,
+    version_number: int,
+    content_md: str,
+    edited_by: str,
+    change_summary: Optional[str],
+) -> None:
+    ver = JDVersion(
+        jd_id=jd_id,
+        version_number=version_number,
+        content_md=content_md,
+        edited_by=edited_by,
+        edited_at=datetime.utcnow(),
+        change_summary=change_summary or "ETL import/update",
     )
-    cur = conn.cursor()
+    db.add(ver)
+    db.commit()
 
-    # create tables
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS job_families (
-      family_id   SERIAL PRIMARY KEY,
-      name        TEXT NOT NULL UNIQUE,
-      description TEXT
-    );
-    CREATE TABLE IF NOT EXISTS jd_taxonomy_tags (
-      tag_id        SERIAL PRIMARY KEY,
-      tag_name      TEXT NOT NULL UNIQUE,
-      description   TEXT,
-      parent_tag_id INT REFERENCES jd_taxonomy_tags(tag_id)
-    );
-    CREATE TABLE IF NOT EXISTS job_descriptions (
-      jd_id           SERIAL PRIMARY KEY,
-      job_code        VARCHAR(50) NOT NULL UNIQUE,
-      title           TEXT NOT NULL,
-      department      TEXT,
-      family_id       INT REFERENCES job_families(family_id),
-      level           VARCHAR(20),
-      employment_type VARCHAR(20),
-      location        TEXT,
-      content_md      TEXT NOT NULL,
-      version         INT NOT NULL DEFAULT 1,
-      created_by      VARCHAR(50),
-      created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS jd_tag_map (
-      jd_id INT REFERENCES job_descriptions(jd_id) ON DELETE CASCADE,
-      tag_id INT REFERENCES jd_taxonomy_tags(tag_id) ON DELETE CASCADE,
-      PRIMARY KEY (jd_id, tag_id)
-    );
-    """)
-    conn.commit()
 
-    # locate markdown files
-    md_dir = os.path.join(os.path.dirname(__file__), "jd_markdown")
-    if not os.path.isdir(md_dir):
-        md_dir = os.path.join(os.path.dirname(__file__), "..", "jd_markdown")
-    md_dir = os.path.abspath(md_dir)
-    md_files = glob.glob(os.path.join(md_dir, "*.md"))
+# ----------------- Core ETL -----------------
+def upsert_jd_from_markdown(
+    db: Session,
+    *,
+    path: str,
+    author: str = "etl",
+    with_tags: bool = True,
+    change_summary: Optional[str] = None,
+    update_existing: bool = True,
+) -> int:
+    """
+    Upsert 1 JD từ file .md:
+    - Nếu tồn tại (theo job_code) → cập nhật content_md, tăng version, ghi jd_versions.
+    - Nếu chưa → tạo mới version=1 + ghi jd_versions(1).
+    """
+    raw = read_text(path)
+    meta, body = parse_front_matter(raw)
 
-    for md_file in md_files:
-        post = frontmatter.load(md_file)
-        meta = post.metadata
-        content = post.content.strip()
+    title      = meta.get("title") or os.path.splitext(os.path.basename(path))[0]
+    department = meta.get("department")
+    level      = meta.get("level")
+    family     = meta.get("job_family")
+    tags       = meta.get("tags") or []
 
-        job_code   = meta.get("job_code")
-        title      = meta.get("title")
-        department = meta.get("department")
-        family     = meta.get("family")
-        level      = meta.get("level")
-        emp_type   = meta.get("employment_type")
-        location   = meta.get("location")
-        created_by = meta.get("created_by", "etl_script")
-        tags       = meta.get("tags", [])
+    # Chuẩn hoá tags
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(",") if t.strip()]
+    elif isinstance(tags, list):
+        tags = [str(t).strip() for t in tags if str(t).strip()]
+    else:
+        tags = []
 
-        if not job_code or not title or not family:
-            print(f"⚠️  Skipping {md_file}: missing job_code/title/family")
-            continue
+    family_id  = get_or_create_family(db, family)
+    job_code   = slugify(meta.get("title") or os.path.basename(path))
 
-        # upsert family
-        cur.execute(
-            "INSERT INTO job_families(name) VALUES(%s) ON CONFLICT(name) DO NOTHING;",
-            (family,)
-        )
-        conn.commit()
-        cur.execute("SELECT family_id FROM job_families WHERE name=%s;", (family,))
-        family_id = cur.fetchone()[0]
+    row = db.query(JobDescription).filter(JobDescription.job_code == job_code).first()
+    if row:
+        if not update_existing:
+            print(f"[JD-ETL] Skip existing: {job_code}")
+            return row.jd_id
 
-        # upsert tags
-        for tag in tags:
-            cur.execute(
-                "INSERT INTO jd_taxonomy_tags(tag_name) VALUES(%s) ON CONFLICT(tag_name) DO NOTHING;",
-                (tag,)
-            )
-        conn.commit()
+        row.title      = title
+        row.department = department
+        row.family_id  = family_id
+        row.level      = level
+        row.content_md = body
+        row.version    = (row.version or 1) + 1
+        row.updated_at = datetime.utcnow()
+        db.commit()
 
-        # upsert job_description
-        cur.execute(
-            """
-            INSERT INTO job_descriptions
-              (job_code, title, department, family_id, level, employment_type, location,
-               content_md, version, created_by, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,1,%s,NOW())
-            ON CONFLICT (job_code) DO UPDATE
-              SET content_md = EXCLUDED.content_md,
-                  version    = job_descriptions.version + 1,
-                  updated_at = NOW();
-            """,
-            (
-                job_code, title, department, family_id, level,
-                emp_type, location, content, created_by
-            )
-        )
-        conn.commit()
+        insert_version(db, row.jd_id, row.version, body, author, change_summary)
+        if with_tags:
+            replace_tag_map(db, row.jd_id, tags)
+        print(f"[JD-ETL] Updated jd_id={row.jd_id} ({job_code}) v={row.version}")
+        return row.jd_id
 
-        cur.execute("SELECT jd_id FROM job_descriptions WHERE job_code=%s;", (job_code,))
-        jd_id = cur.fetchone()[0]
+    # Create mới
+    new = JobDescription(
+        job_code=job_code,
+        title=title,
+        department=department,
+        family_id=family_id,
+        level=level,
+        employment_type=None,
+        location=None,
+        content_md=body,
+        version=1,
+        created_by=author,
+        created_at=datetime.utcnow(),
+        updated_at=None,
+    )
+    db.add(new)
+    db.commit()
+    db.refresh(new)
 
-        # map tags to JD
-        for tag in tags:
-            cur.execute("SELECT tag_id FROM jd_taxonomy_tags WHERE tag_name=%s;", (tag,))
-            tag_id = cur.fetchone()[0]
-            cur.execute(
-                "INSERT INTO jd_tag_map(jd_id,tag_id) VALUES(%s,%s) ON CONFLICT DO NOTHING;",
-                (jd_id, tag_id)
-            )
-        conn.commit()
+    insert_version(db, new.jd_id, 1, body, author, change_summary)
+    if with_tags:
+        replace_tag_map(db, new.jd_id, tags)
+    print(f"[JD-ETL] Inserted jd_id={new.jd_id} ({job_code}) v=1")
+    return new.jd_id
 
-        print(f"✅ Processed JD: {job_code} (ID {jd_id})")
 
-    cur.close()
-    conn.close()
-    print(f"🎉 ETL complete: processed {len(md_files)} JD files.")
+def run_etl(
+    root: str = JD_DIR,
+    *,
+    author: str = "etl",
+    update_existing: bool = True,
+    with_tags: bool = True,
+    change_summary: Optional[str] = None,
+    only: Optional[str] = None,
+    recursive: bool = False,  # mặc định KHÔNG đệ quy
+) -> int:
+    db: Session = SessionLocal()
+    processed = 0
+    try:
+        files = [only] if only else list_md_files(root, recursive=recursive)
+        for p in files:
+            try:
+                upsert_jd_from_markdown(
+                    db,
+                    path=p,
+                    author=author,
+                    with_tags=with_tags,
+                    change_summary=change_summary,
+                    update_existing=update_existing,
+                )
+                processed += 1
+            except Exception as e:
+                print(f"[JD-ETL] ERROR file={p}: {e}")
+        print(f"[JD-ETL] Done. processed={processed} files")
+        return processed
+    finally:
+        db.close()
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="ETL JD markdown -> Postgres (job_descriptions + jd_versions + jd_tag_map)")
+    ap.add_argument("--dir", type=str, default=JD_DIR, help="Thư mục JD .md (mặc định: etl/jd_markdown)")
+    ap.add_argument("--author", type=str, default="etl")
+    ap.add_argument("--no-update", action="store_true", help="Không cập nhật JD đã tồn tại (skip)")
+    ap.add_argument("--no-tags", action="store_true", help="Không ghi JD tag map")
+    ap.add_argument("--summary", type=str, default=None, help="change_summary cho jd_versions")
+    ap.add_argument("--only", type=str, help="Chỉ ETL 1 file cụ thể")
+    ap.add_argument("--recursive", action="store_true", help="Quét đệ quy **/*.md (mặc định: chỉ *.md ở gốc)")
+    args = ap.parse_args()
+
+    run_etl(
+        root=args.dir,
+        author=args.author,
+        update_existing=not args.no_update,
+        with_tags=not args.no_tags,
+        change_summary=args.summary,
+        only=args.only,
+        recursive=args.recursive,
+    )

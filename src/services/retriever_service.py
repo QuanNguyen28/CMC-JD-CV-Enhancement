@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from typing import List, Dict, Optional
 import re, math
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.orm import Session
 from pymilvus import connections, Collection
@@ -14,7 +17,7 @@ try:
     from embeddings.utils.gemini_embed import embed_text as _embed_texts
 except Exception:
     # fallback nếu bạn chỉ có embed_text(str) -> List[float]
-    from src.embeddings.utils.gemini_embed import embed_texts as _embed_texts  # type: ignore
+    from embeddings.utils.gemini_embed import embed_texts as _embed_texts  # type: ignore
 
 try:
     from integrations.minio_client import get_object_str  

@@ -1,7 +1,9 @@
-# src/embeddings/utils/chunker.py
 from __future__ import annotations
 from typing import List
 import re
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def _clean(s: str) -> str:
     s = s or ""
@@ -9,23 +11,15 @@ def _clean(s: str) -> str:
     s = re.sub(r"\n{3,}", "\n\n", s)
     return s.strip()
 
-def split_markdown(
-    md: str,
-    *,
-    max_chars_per_chunk: int = 1200,
-    overlap: int = 150,
-    min_chars: int = 300
-) -> List[str]:
+def split_markdown(md: str, *, max_chars_per_chunk: int = 1200, overlap: int = 150, min_chars: int = 300) -> List[str]:
     """
-    Chunk Markdown theo đoạn/heading. Mục tiêu: 600–1200 ký tự/chunk, có overlap.
+    Chunk Markdown theo đoạn/heading. ~600–1200 ký tự/chunk, có overlap để giữ ngữ cảnh.
     """
     md = _clean(md)
     if not md:
         return []
 
-    # Cắt sơ bộ theo 2 dòng trống hoặc trước heading mới
     parts = re.split(r"(?:\n\s*\n)|(?:\n(?=#))", md)
-
     chunks: List[str] = []
     buf = ""
     for p in parts:
@@ -42,10 +36,8 @@ def split_markdown(
             else:
                 buf = f"{buf}\n{p}"
                 continue
-            # overlap đuôi đoạn cũ
             tail = buf[-overlap:] if overlap > 0 and len(buf) > overlap else ""
             buf = f"{tail}\n{p}" if tail else p
-
     if buf and len(buf.strip()) >= min_chars:
         chunks.append(buf.strip())
 

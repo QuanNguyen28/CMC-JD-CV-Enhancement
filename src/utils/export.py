@@ -7,6 +7,8 @@ without relying on external Markdown or WeasyPrint libraries.
 
 import os
 import tempfile
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from docx import Document
 from reportlab.lib.pagesizes import LETTER

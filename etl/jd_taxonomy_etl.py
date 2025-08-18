@@ -1,69 +1,87 @@
 # etl/jd_taxonomy_etl.py
-#!/usr/bin/env python
-"""
-ETL to load Job Families & Taxonomy Tags from Markdown frontmatter
-"""
+from __future__ import annotations
 import os
-import glob
+import json
+from typing import List, Optional
 import sys
-from dotenv import load_dotenv
-load_dotenv()
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from sqlalchemy.orm import Session
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+from src.db.session import SessionLocal
+from src.db.models import JobFamily, JDTag
 
-import frontmatter
-import psycopg2
-from src.core.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+FAMILY_FILE = os.getenv("JD_FAMILIES_FILE", "etl/taxonomy/families.txt")
+TAGS_FILE   = os.getenv("JD_TAGS_FILE", "etl/taxonomy/tags.txt")
+TAGS_JSON   = os.getenv("JD_TAGS_JSON", "etl/taxonomy/tags.json")  # hỗ trợ parent/child
 
-def main():
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, database=DB_NAME,
-        user=DB_USER, password=DB_PASS
-    )
-    cur = conn.cursor()
+def _read_lines(path: str) -> List[str]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return [ln.strip() for ln in f if ln.strip()]
+    except FileNotFoundError:
+        return []
 
-    # ensure families and tags tables exist
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS job_families (
-      family_id   SERIAL PRIMARY KEY,
-      name        TEXT NOT NULL UNIQUE,
-      description TEXT
-    );
-    CREATE TABLE IF NOT EXISTS jd_taxonomy_tags (
-      tag_id        SERIAL PRIMARY KEY,
-      tag_name      TEXT NOT NULL UNIQUE,
-      description   TEXT,
-      parent_tag_id INT REFERENCES jd_taxonomy_tags(tag_id)
-    );
-    """)
-    conn.commit()
+def seed_families(db: Session, names: List[str]) -> int:
+    inserted = 0
+    for name in names:
+        if not db.query(JobFamily).filter(JobFamily.name == name).first():
+            db.add(JobFamily(name=name, description=None))
+            inserted += 1
+    if inserted:
+        db.commit()
+    return inserted
 
-    # scan markdown for unique families and tags
-    md_dir = os.path.join(os.path.dirname(__file__), 'jd_markdown')
-    md_files = glob.glob(os.path.join(md_dir, '*.md'))
+def _ensure_tag(db: Session, name: str, parent_id: Optional[int]) -> int:
+    row = db.query(JDTag).filter(JDTag.tag_name == name).first()
+    if row:
+        return row.tag_id
+    t = JDTag(tag_name=name, description=None, parent_tag_id=parent_id)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t.tag_id
 
-    families = set()
-    tags = set()
-    for md_file in md_files:
-        post = frontmatter.load(md_file)
-        meta = post.metadata
-        if meta.get('family'):
-            families.add(meta['family'])
-        for t in meta.get('tags', []):
-            tags.add(t)
+def seed_tags_flat(db: Session, names: List[str]) -> int:
+    before = db.query(JDTag).count()
+    for n in names:
+        _ensure_tag(db, n, None)
+    return db.query(JDTag).count() - before
 
-    # upsert families
-    for fam in families:
-        cur.execute("INSERT INTO job_families(name) VALUES(%s) ON CONFLICT(name) DO NOTHING;", (fam,))
-    # upsert tags
-    for t in tags:
-        cur.execute("INSERT INTO jd_taxonomy_tags(tag_name) VALUES(%s) ON CONFLICT(tag_name) DO NOTHING;", (t,))
-    conn.commit()
+def seed_tags_hier(db: Session, nodes: List[dict]) -> int:
+    before = db.query(JDTag).count()
 
-    print(f"🎉 Loaded {len(families)} families and {len(tags)} taxonomy tags.")
-    cur.close()
-    conn.close()
+    def walk(node: dict, parent: Optional[int]):
+        this_id = _ensure_tag(db, node["name"], parent)
+        for ch in node.get("children", []) or []:
+            walk(ch, this_id)
 
-if __name__ == '__main__':
-    main()
+    for n in nodes:
+        walk(n, None)
+
+    return db.query(JDTag).count() - before
+
+def run_seed():
+    db: Session = SessionLocal()
+    try:
+        fams = _read_lines(FAMILY_FILE)
+        if fams:
+            n = seed_families(db, fams)
+            print(f"[TAXO-ETL] Seeded families: +{n}")
+
+        if os.path.exists(TAGS_JSON):
+            with open(TAGS_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f) or []
+            n = seed_tags_hier(db, data)
+            print(f"[TAXO-ETL] Seeded tags (hier): +{n}")
+        else:
+            tags = _read_lines(TAGS_FILE)
+            if tags:
+                n = seed_tags_flat(db, tags)
+                print(f"[TAXO-ETL] Seeded tags (flat): +{n}")
+
+        print("[TAXO-ETL] Done.")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    run_seed()

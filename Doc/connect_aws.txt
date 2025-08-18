@@ -1,9 +1,0 @@
-# Connect to EC2
->>>ssh -i /Users/hoangquannguyen/Documents/Project/ec2-cmcc-dna-ssh-key.pem \
-    ubuntu@ec2-18-141-139-254.ap-southeast-1.compute.amazonaws.com
-
-#Connect to RDS
->>>psql -h aws-cmcc-dna-infras-rdsinstance-wzezdefu1r7p.c9aky6go6fyo.ap-southeast-1.rds.amazonaws.com -U quannguyen -d hcm;
-
-#Disk
->>>cd /mnt/data_volume

@@ -1,4 +1,5 @@
-# src/db/base.py
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import MetaData
 
-Base = declarative_base()
+# KHÔNG gắn schema tại đây → để rỗng và dùng search_path ở session
+Base = declarative_base(metadata=MetaData())

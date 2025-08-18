@@ -2,7 +2,9 @@
 
 import uvicorn
 from fastapi import FastAPI
-
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.api.auth.auth import router as auth_router
 from src.api.v1.jd import router as jd_router
 from src.api.v1.interview import router as interview_router
@@ -33,3 +35,7 @@ def ping():
 
 if __name__ == "__main__":
     uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
+
+# cd /mnt/data_volume/HCM/quannguyen/JD_CV_Enhancement
+# export PYTHONPATH=$(pwd)
+# uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload

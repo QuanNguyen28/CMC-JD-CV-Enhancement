@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from src.schemas.jd import JDGenerateRequest, JDGenerateResponse, JDVersionResponse, JDUpdateRequest
 from src.api.dependencies import get_db, require_roles
-from src.crud.jd_crud import create_jd, get_or_create_family
+from src.crud.jd_crud import create_jd
+from src.services.role_taxonomy_mapper import get_or_create_family
 from src.services.llm_prompt_orchestrator import generate_jd_text
 from src.services.jd_versioning_service import get_versions, update_jd
 from src.services.export_bridge import export_jd_file
@@ -23,18 +24,23 @@ def create_jd_endpoint(
     Generate a new Job Description via LLM, store the JD record, and record its version.
     """
     try:
-        # Resolve job_family → family_id
-        family_id = get_or_create_family(db, req.job_family)
+        # Resolve job_family → family_id (optional)
+        family_id = get_or_create_family(db, req.job_family) if getattr(req, "job_family", None) else None
 
         # Insert the JD record and get its ID
         jd_id = create_jd(db, req=req, created_by=current_user.username, family_id=family_id)
 
-        # Prepare metadata for LLM
-        metadata = req.dict()
+        # Prepare metadata for LLM (+ optional RAG chunks)
+        chunks_list = (req.chunks or []) if hasattr(req, "chunks") else []
+        chunks_text = "\n\n---\n".join([c.strip() for c in chunks_list if c and str(c).strip()])
+
+        metadata = req.model_dump() if hasattr(req, "model_dump") else req.dict()
         metadata.update({
             "jd_id": jd_id,
             "created_by": current_user.username,
-            "family_id": family_id
+            "family_id": family_id,
+            "chunks": chunks_list,
+            "chunks_text": chunks_text,
         })
 
         # Generate content and record version

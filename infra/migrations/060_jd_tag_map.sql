@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS jd_tag_map (
+  jd_id  INTEGER NOT NULL REFERENCES job_descriptions(jd_id) ON UPDATE CASCADE ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES jd_taxonomy_tags(tag_id) ON UPDATE CASCADE ON DELETE CASCADE,
+  PRIMARY KEY (jd_id, tag_id)
+);

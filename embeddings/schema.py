@@ -1,4 +1,4 @@
-# src/embeddings/schema.py
+# embeddings/schema.py
 from __future__ import annotations
 from typing import Optional
 
@@ -8,26 +8,23 @@ from pymilvus import (
 
 from src.core.config import MILVUS_HOST, MILVUS_PORT, MILVUS_COLLECTION, VECTOR_DIM
 
-# Tên collection & field dùng thống nhất ở toàn dự án
-COLLECTION_NAME = MILVUS_COLLECTION
-FIELD_CHUNK_ID   = "chunk_id"
-FIELD_JD_ID      = "jd_id"
-FIELD_INDEX      = "chunk_index"
-FIELD_OBJECT_URL = "object_url"
-FIELD_EMBEDDING  = "embedding"
+COLLECTION_NAME   = MILVUS_COLLECTION
+FIELD_CHUNK_ID    = "chunk_id"
+FIELD_JD_ID       = "jd_id"
+FIELD_INDEX       = "chunk_index"
+FIELD_OBJECT_URL  = "object_url"
+FIELD_EMBEDDING   = "embedding"
 
-_DEFAULT_INDEX_PARAMS = {
+_DEFAULT_INDEX = {
     "index_type": "HNSW",
     "metric_type": "COSINE",
     "params": {"M": 32, "efConstruction": 200},
 }
 
 def connect() -> None:
-    """Kết nối Milvus theo config."""
     connections.connect(alias="default", host=MILVUS_HOST, port=str(MILVUS_PORT))
 
 def _schema() -> CollectionSchema:
-    """Định nghĩa schema collection JD chunks."""
     fields = [
         FieldSchema(name=FIELD_CHUNK_ID,   dtype=DataType.VARCHAR, max_length=64,   is_primary=True),
         FieldSchema(name=FIELD_JD_ID,      dtype=DataType.INT64),
@@ -38,17 +35,12 @@ def _schema() -> CollectionSchema:
     return CollectionSchema(fields, description="JD chunks for semantic search (COSINE)")
 
 def ensure_collection(index_params: Optional[dict] = None, *, load: bool = True) -> Collection:
-    """
-    Tạo collection nếu chưa có, tạo index COSINE và load vào bộ nhớ.
-    """
-    index_params = index_params or _DEFAULT_INDEX_PARAMS
-
+    index_params = index_params or _DEFAULT_INDEX
     if not utility.has_collection(COLLECTION_NAME):
         col = Collection(COLLECTION_NAME, _schema(), consistency_level="Strong")
         col.create_index(field_name=FIELD_EMBEDDING, index_params=index_params)
     else:
         col = Collection(COLLECTION_NAME)
-
     if load:
         try:
             col.load()
@@ -57,6 +49,5 @@ def ensure_collection(index_params: Optional[dict] = None, *, load: bool = True)
     return col
 
 def drop_collection() -> None:
-    """Dùng cho debug/rebuild."""
     if utility.has_collection(COLLECTION_NAME):
         utility.drop_collection(COLLECTION_NAME)

@@ -82,5 +82,6 @@ def main():
     cur.close()
     conn.close()
 
-if __name__ == '__main__':
-    main()
+# etl/profiles_etl.py
+if __name__ == "__main__":
+    print("Profiles ETL is disabled in this project setup.")

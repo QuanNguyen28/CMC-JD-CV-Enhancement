@@ -1,6 +1,9 @@
 # src/services/access_control_service.py
 from fastapi import HTTPException, status
 from typing import List
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.schemas.auth import User as UserSchema
 
 class AccessControlService:

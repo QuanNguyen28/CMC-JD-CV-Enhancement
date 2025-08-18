@@ -1,7 +1,7 @@
 # src/schemas/chunk.py
+from __future__ import annotations
 from pydantic import BaseModel
 from typing import List, Optional
-from __future__ import annotations
 
 class ChunkRequest(BaseModel):
     query: str
