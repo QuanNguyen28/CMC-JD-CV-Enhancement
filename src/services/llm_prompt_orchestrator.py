@@ -31,16 +31,10 @@ def _render_prompt(context: Dict[str, Any]) -> str:
     """
     try:
         tmpl = env.get_template("jd_generation.j2")
-<<<<<<< HEAD
-        # Pass context keys directly (template expects title/level/department/...)
-        return tmpl.render(**context)
-    except Exception:
-        # Fallback: inline prompt with optional chunks_text
-=======
         # pass context keys directly (template should expect title/level/department/job_family/chunks_text)
         return tmpl.render(**context)
     except Exception:
->>>>>>> 42eedfa (chore: merge with remote skeleton)
+        # Fallback: inline prompt with optional chunks_text
         title = context.get("title", "")
         department = context.get("department", "")
         level = context.get("level", "")
@@ -75,26 +69,6 @@ Return Markdown with sections:
 
 def _llm_generate(prompt: str) -> str:
     """
-<<<<<<< HEAD
-    Call Gemini and return plain text/markdown. Uses the responses API.
-    """
-    resp = _client.responses.generate(
-        model=GEMINI_CHAT_MODEL,
-        input=[{"role": "user", "content": prompt}],
-    )
-    # Collect text from candidates
-    out: List[str] = []
-    for cand in getattr(resp, "candidates", []) or []:
-        content = getattr(cand, "content", None)
-        if not content or not getattr(content, "parts", None):
-            continue
-        for part in content.parts:
-            txt = getattr(part, "text", None)
-            if txt:
-                out.append(txt)
-    text = "\n".join(out).strip()
-    return text or "# Job Description\n\n(Empty content)"
-=======
     Call Gemini and return plain text/markdown via models.generate_content.
     """
     resp = _client.models.generate_content(
@@ -103,7 +77,6 @@ def _llm_generate(prompt: str) -> str:
     )
     text = getattr(resp, "text", "") or ""
     return text.strip() or "# Job Description\n\n(Empty content)"
->>>>>>> 42eedfa (chore: merge with remote skeleton)
 
 def generate_jd_text(metadata: Dict[str, Any], db: Session) -> Tuple[str, int]:
     """
