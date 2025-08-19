@@ -1,12 +1,9 @@
 # src/services/jd_versioning_service.py
 from datetime import datetime
-<<<<<<< HEAD
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-=======
 from typing import List, Dict, Optional
->>>>>>> 42eedfa (chore: merge with remote skeleton)
 from sqlalchemy.orm import Session
 
 from src.db.models import JobDescription as JDModel, JDVersion as VerModel
