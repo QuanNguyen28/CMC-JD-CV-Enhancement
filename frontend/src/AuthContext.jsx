@@ -1,46 +1,48 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+// src/AuthContext.jsx
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import api from './api'
 
-const AuthContext = createContext();
+const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [user, setUser]   = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('token') || '')
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(!!token)
 
-  // Khi token thay đổi, cấu hình Axios và fetch thông tin user
   useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Giả sử bạn có endpoint GET /auth/me trả user info và roles
-      axios.get('/auth/me')
-        .then(res => setUser(res.data))
-        .catch(() => logout());
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-      setUser(null);
-    }
-  }, [token]);
+    if (!token) return
+    api.get('/auth/me')
+      .then(res => setUser(res.data))
+      .catch(() => {
+        localStorage.removeItem('token')
+        setToken('')
+      })
+      .finally(() => setLoading(false))
+  }, [token])
 
   const login = async (username, password) => {
-    const res = await axios.post('/auth/token', new URLSearchParams({
-      username, password
-    }), {
+    const form = new URLSearchParams({ username, password })
+    const res = await api.post('/auth/token', form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-    localStorage.setItem('token', res.data.access_token);
-    setToken(res.data.access_token);
-  };
+    })
+    const t = res.data.access_token
+    localStorage.setItem('token', t)
+    setToken(t)
+    const me = await api.get('/auth/me')
+    setUser(me.data)
+  }
 
   const logout = () => {
-    localStorage.removeItem('token');
-    setToken('');
-  };
+    localStorage.removeItem('token')
+    setToken('')
+    setUser(null)
+  }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
-  );
+  )
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext)

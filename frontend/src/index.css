@@ -1,27 +1,13 @@
 /* src/index.css */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Global styles */
-html, body {
-  height: 100%;
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-body {
-  @apply bg-gray-50 text-gray-800;
-}
-
-#root {
-  @apply flex flex-col items-center justify-start min-h-screen;
-}
-
-/* Input and button resets */
-input, button {
-  font-family: inherit;
-}
-
-/* Additional utility classes or custom styles can go here */
+/* Global neumorphism helpers */
+.neo { @apply bg-surface rounded-2xl shadow-neo; }
+.neo-in { @apply bg-surface rounded-2xl shadow-neoin; }
+.btn-primary { @apply px-4 py-2 rounded-xl bg-accent text-white font-medium shadow hover:opacity-90 transition; }
+.btn-ghost { @apply px-4 py-2 rounded-xl bg-transparent hover:bg-white/40 transition; }
+.input { @apply w-full px-4 py-3 rounded-xl bg-surface shadow-neoin outline-none focus:shadow-neo transition; }
+.card { @apply neo p-4; }
+.label { @apply text-sm text-gray-600; }

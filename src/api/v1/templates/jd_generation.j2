@@ -1,16 +1,20 @@
-{{ metadata.title }} (Level: {{ metadata.level }}, Department: {{ metadata.department }})
+{# src/api/v1/templates/jd_generation.j2 #}
+You are an expert HR assistant. Draft a high-quality Job Description in Markdown.
 
-Context Chunks:
-{% for c in chunks %}
-- {{ c }}
-{% endfor %}
+Role title: {{ title }}
+{% if department %}Department: {{ department }}{% endif %}
+{% if level %}Seniority level: {{ level }}{% endif %}
+{% if job_family %}Job family: {{ job_family }}{% endif %}
 
-Using the context above, please draft a concise, well-structured **Job Description** including these sections:
-1. **Responsibilities**:  
-   - List 4–6 bullet points of primary duties.
-2. **Requirements**:  
-   - List 3–5 bullet points of required skills/experience.
-3. **Benefits**:  
-   - List 2–3 example perks or benefits.
+{% if chunks_text %}
+### Context from chunks (internal, prioritize alignment)
+{{ chunks_text }}
+{% endif %}
 
-Use professional tone, keep each bullet under 20 words.
+Return Markdown with sections:
+- Summary
+- Responsibilities (bullet points)
+- Requirements (must-have vs. nice-to-have)
+- Skills (technical & soft)
+- Benefits / Working conditions
+- Interview focus (bullet points)

@@ -21,3 +21,17 @@ class ChunkDoc(BaseModel):
     jd_id: int
     chunk_index: int
     object_url: str
+
+class RetrieveRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    exclude_jd_ids: Optional[List[int]] = NotImplemented
+    family_id: Optional[int] = None
+
+class ChunkResult(BaseModel):
+    chunk_id: str
+    jd_id: int
+    chunk_index: int
+    object_path: str
+    score: float 
+

@@ -1,69 +1,27 @@
 # src/api/v1/retriever.py
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional
-from sqlalchemy.orm import Session
-
-from src.api.dependencies import get_db, require_roles
-from src.services.retriever_service import semantic_retrieve
+from typing import List
+from src.api.dependencies import require_roles
+from src.services.retriever_service import (
+    RetrieveSimilarReq, RetrieveReq, ChunkResult,
+    retrieve_similar, retrieve_with_snippet
+)
+from embeddings.utils.gemini_embed import embed_text  # hàm tạo vector từ query
 
 router = APIRouter(prefix="/v1/retrieve", tags=["Retriever"])
 
-# ====== Schemas ======
-class RetrieveRequest(BaseModel):
-    query: str
-    top_k: int = 5
-    prefer_minio: Optional[bool] = False
-
-class ChunkResult(BaseModel):
-    chunk_id: str
-    jd_id: int
-    chunk_index: int
-    object_url: str
-    score: float
-
-
-# ====== Endpoints ======
-@router.post(
-    "",
-    response_model=List[ChunkResult],
-    dependencies=[Depends(require_roles("recruiter", "manager", "admin"))],
-)
-@router.post(
-    "/similar",
-    response_model=List[ChunkResult],
-    dependencies=[Depends(require_roles("recruiter", "manager", "admin"))],
-)
-def retrieve_endpoint(
-    req: RetrieveRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Semantic retrieve over Milvus using COSINE.
-    - Embed query (unit-normalized) -> Milvus search (anns_field='embedding')
-    - Trả về: chunk_id, jd_id, chunk_index, object_url, score(similarity)
-    - Nếu muốn trả snippet: bật trong service và thêm field vào ChunkResult.
-    """
+@router.post("/similar", response_model=List[ChunkResult])
+def retrieve_similar_endpoint(req: RetrieveSimilarReq, _: str = Depends(require_roles("recruiter","manager","admin"))):
     try:
-        if not req.query or not req.query.strip():
-            raise HTTPException(status_code=400, detail="Query is required")
+        qvec = embed_text([req.query])[0]
+        return retrieve_similar(qvec, req.top_k)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Retrieval failed: {e}")
 
-        results = semantic_retrieve(
-            db=db,
-            query=req.query.strip(),
-            top_k=max(1, req.top_k),
-            prefer_minio=bool(req.prefer_minio),
-        )
-        if not results:
-            # không coi là lỗi; bạn có thể đổi thành 404 nếu muốn
-            return []
-
-        # Map dict -> Pydantic model (nếu service đã khớp key, có thể return thẳng)
-        return [ChunkResult(**r) for r in results]
-
-    except HTTPException:
-        raise
+@router.post("", response_model=List[ChunkResult])
+def retrieve_endpoint(req: RetrieveReq, _: str = Depends(require_roles("recruiter","manager","admin"))):
+    try:
+        qvec = embed_text([req.query])[0]
+        return retrieve_with_snippet(qvec, req.top_k, req.snippet_lines)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Retrieval failed: {e}")

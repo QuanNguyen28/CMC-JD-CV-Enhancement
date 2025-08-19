@@ -1,7 +1,7 @@
 # src/schemas/retriever.py
 from __future__ import annotations
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, List
+from pydantic import BaseModel, Field
 
 class RetrieveRequest(BaseModel):
     query: str
@@ -15,3 +15,19 @@ class ChunkResult(BaseModel):
     object_url: str
     score: float
     # snippet: Optional[str] = None  # bật nếu service trả kèm
+
+class RetrieveRequest(BaseModel):
+    query: str = Field(..., min_length=2)
+    top_k: int = Field(5, ge=1, le=100)
+    with_snippet: bool = False
+
+class ChunkHit(BaseModel):
+    chunk_id: str
+    jd_id: Optional[int] = None
+    chunk_index: Optional[int] = None
+    object_path: str
+    score: float
+    snippet: Optional[str] = None
+
+class RetrieveResponse(BaseModel):
+    items: List[ChunkHit]
