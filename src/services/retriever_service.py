@@ -1,35 +1,14 @@
 # src/services/retriever_service.py
-<<<<<<< HEAD
-from __future__ import annotations
-
-from typing import List, Dict, Optional
-import re, math
-import os
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from sqlalchemy.orm import Session
-=======
 from typing import List, Optional
 from pydantic import BaseModel
->>>>>>> 42eedfa (chore: merge with remote skeleton)
 from pymilvus import connections, Collection
 from src.core.config import MILVUS_HOST, MILVUS_PORT, MILVUS_COLLECTION
 import os
 
-<<<<<<< HEAD
-# Embeddings: ưu tiên embed_texts([str]) -> List[List[float]]
-try:
-    from embeddings.utils.gemini_embed import embed_text as _embed_texts
-except Exception:
-    # fallback nếu bạn chỉ có embed_text(str) -> List[float]
-    from embeddings.utils.gemini_embed import embed_texts as _embed_texts  # type: ignore
-=======
 # ---- Milvus init ----
 connections.connect("default", host=MILVUS_HOST, port=str(MILVUS_PORT))
 collection = Collection(MILVUS_COLLECTION)
 collection.load()
->>>>>>> 42eedfa (chore: merge with remote skeleton)
 
 def _resolve_path_field(col: Collection) -> Optional[str]:
     """Tự dò tên cột lưu đường dẫn file trong schema Milvus."""
