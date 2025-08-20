@@ -1,5 +1,8 @@
+# src/db/base.py
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
+from src.core.config import DB_SCHEMA  # ví dụ: "smarthire"
 
-# KHÔNG gắn schema tại đây → để rỗng và dùng search_path ở session
-Base = declarative_base(metadata=MetaData())
+# Gắn schema mặc định cho toàn bộ Base
+metadata = MetaData(schema=DB_SCHEMA)
+Base = declarative_base(metadata=metadata)

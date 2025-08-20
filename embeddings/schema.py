@@ -1,7 +1,8 @@
 # embeddings/schema.py
 from __future__ import annotations
 from typing import Optional
-
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pymilvus import (
     connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 )
