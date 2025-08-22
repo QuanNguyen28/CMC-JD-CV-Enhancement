@@ -10,11 +10,20 @@ from src.api.v1.jd import router as jd_router
 from src.api.v1.interview import router as interview_router
 from src.api.v1.roles import router as roles_router
 from src.api.v1.retriever import router as retrieve_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="SmartHire Composer API",
     version="1.0.0",
     description="AI-powered assistant for creating and managing job descriptions & interview questions"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],  # cần cho Authorization
 )
 
 # Authentication (no extra prefix)

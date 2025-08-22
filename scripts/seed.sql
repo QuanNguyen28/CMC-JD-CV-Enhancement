@@ -14,3 +14,12 @@ SELECT u.user_id, r.role_id
 FROM users u, roles r
 WHERE u.username='kkcom' AND r.role_name='admin'
 ON CONFLICT DO NOTHING;
+
+-- # tạo bcrypt hash
+-- from passlib.hash import bcrypt
+-- print(bcrypt.hash("alice123456@"))
+
+SET search_path TO smarthire, public;
+UPDATE users
+SET hashed_pw = '$2b$12$AhZE32Nq2Q2gjHooqS6W6OrTX/K1R95dq4L3VKtA4c9al2jGFB6RG'
+WHERE username = 'alice';

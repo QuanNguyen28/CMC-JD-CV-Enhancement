@@ -20,5 +20,4 @@ python-multipart
 python-jose[cryptography]
 bcrypt
 python-multipart
-exceptions
 reportlab
