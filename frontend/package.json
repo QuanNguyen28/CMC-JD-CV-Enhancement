@@ -1,36 +1,33 @@
 {
-  "name": "smarthire-composer-frontend",
-  "version": "1.0.0",
+  "name": "smarthire-frontend",
   "private": true,
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 5173"
+    "preview": "vite preview --port 5173 --strictPort",
+    "start": "vite"
   },
   "dependencies": {
     "@iconify/react": "^6.0.0",
     "axios": "^1.11.0",
     "clsx": "^2.1.1",
-    "dompurify": "^3.1.6",
-    "framer-motion": "^11.18.2",
-    "lucide-react": "^0.441.0",
-    "marked": "^12.0.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.1",
+    "dompurify": "^3.2.6",
+    "framer-motion": "^12.23.12",
+    "lucide-react": "^0.541.0",
+    "marked": "^16.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.8.2",
     "recharts": "^3.1.2"
   },
   "devDependencies": {
-    "@types/dompurify": "^3.0.5",
-    "@types/node": "^22.0.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^5.0.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.10",
-    "vite": "^5.4.19"
+    "@tailwindcss/forms": "^0.5.10",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.3.4"
   }
 }

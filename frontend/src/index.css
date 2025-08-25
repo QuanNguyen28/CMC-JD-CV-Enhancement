@@ -2,26 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
-:root{
-  --bg-grad: radial-gradient(1200px 600px at 20% -10%, #E9F0FF 0%, transparent 60%),
-             radial-gradient(1000px 800px at 110% 10%, #F5ECFF 0%, transparent 60%),
-             linear-gradient(180deg, #F8FAFF 0%, #F3F6FB 100%);
+/* Neumorphism helpers */
+:root {
+  --neo-bg: #f4f6fa;
+  --neo-dark: #d9dce2;
+  --neo-light: #ffffff;
 }
 
-html, body, #root { height: 100%; }
-body{
-  @apply text-ink/90 antialiased;
-  background: var(--bg-grad);
+body {
+  @apply bg-[var(--neo-bg)] text-ink antialiased;
 }
 
-.neo { /* neumorphism */
-  box-shadow: 8px 8px 24px rgba(15,23,42,.08), -6px -6px 20px rgba(255,255,255,.95);
-  @apply bg-card rounded-2xl;
+/* Reusable utilities */
+.neo {
+  box-shadow: 10px 10px 24px var(--neo-dark), -10px -10px 24px var(--neo-light);
+  border-radius: 1rem;
+  background: var(--neo-bg);
 }
-.glass { /* mờ nhẹ */
-  @apply rounded-2xl bg-white/70 backdrop-blur-md shadow-soft;
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2 font-medium text-white bg-primary hover:opacity-90 transition;
+  box-shadow: 0 8px 24px rgba(79,142,247,.35);
 }
+
+.card {
+  @apply neo p-5;
+}
+
 .pill {
-  @apply px-3 py-1 rounded-full text-sm font-medium bg-surface shadow-inner;
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100;
 }
-.card-title { @apply text-sm uppercase tracking-wide text-muted font-semibold; }
