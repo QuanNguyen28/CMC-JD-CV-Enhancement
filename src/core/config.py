@@ -8,12 +8,12 @@ load_dotenv()
 ALGORITHM = "HS256"
 
 # — PostgreSQL configuration —
-DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_HOST = os.getenv("DB_HOST")
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
 DB_NAME = os.getenv("DB_NAME", "hcm")
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
-DB_SCHEMA = os.getenv("DB_SCHEMA", "public")  # <— thêm dòng này
+DB_SCHEMA = os.getenv("DB_SCHEMA", "smarthire")
 
 # Compose SQLAlchemy Database URL
 DATABASE_URL = (
@@ -31,12 +31,6 @@ GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
 
 # — Local embedding fallback —
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-
-# # — MinIO configuration —
-# MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-# MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-# MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-# MINIO_BUCKET = os.getenv("MINIO_BUCKET", "jdchunks")
 
 # — Milvus configuration —
 MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")

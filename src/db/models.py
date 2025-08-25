@@ -7,8 +7,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
-
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import MetaData
+from src.core.config import DB_SCHEMA
 from .base import Base
+
+metadata = MetaData(schema=DB_SCHEMA)
+Base = declarative_base(metadata=metadata)
 
 class JobFamily(Base):
     __tablename__ = "job_families"
