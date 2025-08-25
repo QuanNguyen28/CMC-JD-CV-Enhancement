@@ -1,28 +1,54 @@
-// src/components/JDVersionHistory.jsx
-import React, { useEffect, useState } from 'react'
-import api from '../api'
-import NeumorphicCard from './NeumorphicCard'
+import { useEffect, useState } from 'react';
+import { JDAPI } from '../api';
 
-export default function JDVersionHistory({ jdId }) {
-  const [items, setItems] = useState([])
+export default function JDVersionHistory({ jdId, onSelect }) {
+  const [items, setItems] = useState([]);
+  const [err, setErr] = useState('');
 
   useEffect(() => {
-    if (!jdId) return
-    api.get(`/v1/jd/version-history/${jdId}`).then(res => setItems(res.data || [])).catch(()=>{})
-  }, [jdId])
+    let mounted = true;
+    const run = async () => {
+      if (!jdId) { setItems([]); return; }
+      try {
+        const data = await JDAPI.versions(jdId);
+        // sort desc by version/version_number
+        const normalized = (data || []).map(v => ({
+          version: v.version_number ?? v.version,
+          content_md: v.content_md,
+          edited_by: v.edited_by ?? v.updated_by,
+          edited_at: v.edited_at ?? v.updated_at,
+        })).sort((a,b) => (b.version ?? 0) - (a.version ?? 0));
+        if (mounted) setItems(normalized);
+      } catch (e) {
+        setErr(e?.response?.data?.detail || String(e));
+      }
+    };
+    run();
+    return () => { mounted = false; };
+  }, [jdId]);
+
+  if (!jdId) return (
+    <div className="bg-white border rounded-xl p-4 text-sm text-gray-500">Version history will appear here after generating a JD.</div>
+  );
+  if (err) return <div className="text-red-600 text-sm">{err}</div>;
 
   return (
-    <NeumorphicCard>
-      <div className="font-medium mb-2">Version History</div>
-      <div className="space-y-2 max-h-80 overflow-auto pr-2">
-        {items.map(v => (
-          <div key={v.version || v.version_number} className="neo-in p-3 rounded-xl">
-            <div className="text-sm">v{v.version || v.version_number}</div>
-            <div className="text-xs text-gray-500">{new Date(v.updated_at || v.edited_at).toLocaleString()} · {v.updated_by || v.edited_by}</div>
-          </div>
+    <div className="bg-white border rounded-xl p-4">
+      <div className="font-semibold mb-3">Version History</div>
+      <ul className="space-y-2 max-h-[360px] overflow-auto">
+        {items.map((v) => (
+          <li
+            key={v.version}
+            className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
+            onClick={() => onSelect?.(v)}
+          >
+            <div className="text-sm font-medium">v{v.version}</div>
+            <div className="text-xs text-gray-500">
+              {v.edited_by} • {new Date(v.edited_at).toLocaleString()}
+            </div>
+          </li>
         ))}
-        {!items.length && <div className="text-sm text-gray-500">No versions yet.</div>}
-      </div>
-    </NeumorphicCard>
-  )
+      </ul>
+    </div>
+  );
 }

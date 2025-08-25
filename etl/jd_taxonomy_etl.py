@@ -12,7 +12,7 @@ from src.db.models import JobFamily, JDTag
 
 FAMILY_FILE = os.getenv("JD_FAMILIES_FILE", "etl/taxonomy/families.txt")
 TAGS_FILE   = os.getenv("JD_TAGS_FILE", "etl/taxonomy/tags.txt")
-TAGS_JSON   = os.getenv("JD_TAGS_JSON", "etl/taxonomy/tags.json")  # hỗ trợ parent/child
+TAGS_JSON   = os.getenv("JD_TAGS_JSON", "etl/taxonomy/tags.json")  
 
 def _read_lines(path: str) -> List[str]:
     try:

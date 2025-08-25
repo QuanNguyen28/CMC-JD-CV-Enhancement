@@ -1,30 +1,36 @@
-// src/components/ExportOptions.jsx
-import React, { useState } from 'react'
-import api from '../api'
-import { downloadBlob } from '../utils/download'
-import NeumorphicCard from './NeumorphicCard'
+import { JDAPI } from '../api';
 
 export default function ExportOptions({ jdId }) {
-  const [downloading, setDownloading] = useState(false)
-
-  const exportAs = async (format) => {
-    setDownloading(true)
-    try {
-      const res = await api.get(`/v1/jd/export/${jdId}?format=${format}`, { responseType: 'arraybuffer' })
-      const type = format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      downloadBlob(res.data, `jd_${jdId}.${format}`, type)
-    } catch (e) {
-      // swallow
-    } finally { setDownloading(false) }
-  }
+  const download = async (fmt) => {
+    if (!jdId) return;
+    const blob = await JDAPI.export(jdId, fmt);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `JD-${jdId}.${fmt}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <NeumorphicCard>
-      <div className="font-medium mb-2">Export</div>
+    <div className="bg-white border rounded-xl p-4">
+      <div className="font-semibold mb-3">Export</div>
       <div className="flex gap-2">
-        <button disabled={!jdId || downloading} onClick={() => exportAs('pdf')} className="btn-ghost">PDF</button>
-        <button disabled={!jdId || downloading} onClick={() => exportAs('docx')} className="btn-ghost">DOCX</button>
+        <button
+          disabled={!jdId}
+          onClick={() => download('pdf')}
+          className="px-3 py-1.5 rounded-md bg-gray-800 text-white disabled:opacity-50"
+        >
+          PDF
+        </button>
+        <button
+          disabled={!jdId}
+          onClick={() => download('docx')}
+          className="px-3 py-1.5 rounded-md bg-gray-700 text-white disabled:opacity-50"
+        >
+          DOCX
+        </button>
       </div>
-    </NeumorphicCard>
-  )
+    </div>
+  );
 }

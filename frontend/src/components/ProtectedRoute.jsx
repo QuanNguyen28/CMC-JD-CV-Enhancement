@@ -1,11 +1,15 @@
-// src/components/ProtectedRoute.jsx
-import React from 'react'
-import { Navigate } from 'react-router-dom'
-import { useAuth } from '../AuthContext'
+// frontend/src/components/ProtectedRoute.jsx
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 
 export default function ProtectedRoute({ children }) {
-  const { token, loading } = useAuth()
-  if (loading) return <div className="p-10 text-center">Loading…</div>
-  if (!token) return <Navigate to="/login" replace />
-  return children
+  const { user, initializing } = useAuth();
+  const location = useLocation();
+
+  if (initializing) return null; // hoặc spinner
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return children;
 }

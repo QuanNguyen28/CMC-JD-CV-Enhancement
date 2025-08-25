@@ -1,24 +1,15 @@
-# src/api/dependencies.py
-"""
-Dependencies for FastAPI endpoints:
-- Database session (SQLAlchemy)
-- OAuth2 bearer token
-- Current user & RBAC
-"""
-from typing import Callable, List
-
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 
 from src.db.session import SessionLocal
+from src.crud.auth_crud import get_user
 from src.core.config import JWT_SECRET_KEY, ALGORITHM
-from src.schemas.auth import User as UserSchema, TokenData
-from src.db.models import User as DBUser, Role as DBRole
-from src.crud.auth_crud import get_user  # <- chỉ cần get_user, tránh import vòng tròn
 
-# --- DB session dependency ---
+# Swagger sẽ hiển thị form login dựa vào tokenUrl này
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
 def get_db():
     db = SessionLocal()
     try:
@@ -26,53 +17,38 @@ def get_db():
     finally:
         db.close()
 
-# --- OAuth2 scheme ---
-# NOTE: tokenUrl phải trỏ tới đúng route bạn đã khai báo trong auth.py
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
-
-# --- Current user from Bearer token ---
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> UserSchema:
-    """
-    Decode JWT từ header Authorization: Bearer <token>, lấy user từ DB,
-    rồi map sang UserSchema (pydantic) để trả về.
-    """
-    credentials_exception = HTTPException(
+def _cred_exc():
+    return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
     )
 
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    # DEBUG: kiểm tra nhanh format header đã đúng chưa (Bearer <token>)
+    if not token or not isinstance(token, str):
+        raise _cred_exc()
+
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        # Nếu có dùng audience/issuer thì thêm verify_* tương ứng
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM], options={"verify_aud": False})
         username: str | None = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
+        if not username:
+            # token thiếu claim sub
+            raise _cred_exc()
     except JWTError:
-        raise credentials_exception
+        # token hỏng / signature sai / secret khác
+        raise _cred_exc()
 
-    user: DBUser | None = get_user(db, token_data.username)
-    if user is None or user.is_active is False:
-        raise credentials_exception
+    user = get_user(db, username)
+    if not user:
+        raise _cred_exc()
+    return user
 
-    # Map sang schema (roles -> list[str]) nhờ validator + orm_mode
-    return UserSchema.model_validate(user, from_attributes=True)
-
-# --- RBAC helper ---
-def require_roles(*allowed: str) -> Callable:
-    """
-    Usage:
-      Depends(require_roles("admin", "recruiter"))
-    """
-    allowed_set = set(a.lower() for a in allowed)
-
-    def _checker(current_user: UserSchema = Depends(get_current_user)) -> UserSchema:
-        user_roles = set((current_user.roles or []))
-        # current_user.roles đã là list[str] (validator trong schemas.auth)
-        if not (user_roles & allowed_set):
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+def require_roles(*allowed: str):
+    def _dep(current_user = Depends(get_current_user)):
+        have = {getattr(r, "role_name", r) for r in getattr(current_user, "roles", [])}
+        if not have.intersection(set(allowed)):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
         return current_user
-
-    return _checker
+    return _dep

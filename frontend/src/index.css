@@ -1,13 +1,27 @@
-/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Global neumorphism helpers */
-.neo { @apply bg-surface rounded-2xl shadow-neo; }
-.neo-in { @apply bg-surface rounded-2xl shadow-neoin; }
-.btn-primary { @apply px-4 py-2 rounded-xl bg-accent text-white font-medium shadow hover:opacity-90 transition; }
-.btn-ghost { @apply px-4 py-2 rounded-xl bg-transparent hover:bg-white/40 transition; }
-.input { @apply w-full px-4 py-3 rounded-xl bg-surface shadow-neoin outline-none focus:shadow-neo transition; }
-.card { @apply neo p-4; }
-.label { @apply text-sm text-gray-600; }
+:root{
+  --bg-grad: radial-gradient(1200px 600px at 20% -10%, #E9F0FF 0%, transparent 60%),
+             radial-gradient(1000px 800px at 110% 10%, #F5ECFF 0%, transparent 60%),
+             linear-gradient(180deg, #F8FAFF 0%, #F3F6FB 100%);
+}
+
+html, body, #root { height: 100%; }
+body{
+  @apply text-ink/90 antialiased;
+  background: var(--bg-grad);
+}
+
+.neo { /* neumorphism */
+  box-shadow: 8px 8px 24px rgba(15,23,42,.08), -6px -6px 20px rgba(255,255,255,.95);
+  @apply bg-card rounded-2xl;
+}
+.glass { /* mờ nhẹ */
+  @apply rounded-2xl bg-white/70 backdrop-blur-md shadow-soft;
+}
+.pill {
+  @apply px-3 py-1 rounded-full text-sm font-medium bg-surface shadow-inner;
+}
+.card-title { @apply text-sm uppercase tracking-wide text-muted font-semibold; }
