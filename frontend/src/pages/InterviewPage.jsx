@@ -1,127 +1,139 @@
-import { useState } from 'react';
-import { InterviewAPI } from '../api';
+import { useState } from "react";
+import api from "../api";
+import { MessageSquare, Loader2 } from "lucide-react";
+
+const MIXES = ["technical", "behavioral", "situational"];
 
 export default function InterviewPage() {
-  const [payload, setPayload] = useState({
+  const [form, setForm] = useState({
     jd_id: 0,
-    title: '',
-    level: '',
-    department: '',
+    title: "",
+    level: "Mid",
+    department: "",
     focus: [],
     count: 8,
-    mix: ['technical', 'behavioral', 'situational'],
-    language: 'vi',
+    mix: [...MIXES],
+    language: "vi",
   });
-
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
 
-  const toggleFocus = (tag) => {
-    setPayload(p => {
-      const has = p.focus.includes(tag);
-      return { ...p, focus: has ? p.focus.filter(t => t !== tag) : [...p.focus, tag] };
-    });
-  };
+  const onChange = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
-  const run = async () => {
-    setBusy(true); setErr('');
+  const toggleMix = (m) =>
+    setForm((s) => ({
+      ...s,
+      mix: s.mix.includes(m) ? s.mix.filter((x) => x !== m) : [...s.mix, m],
+    }));
+
+  async function generate() {
+    setLoading(true);
     try {
-      const data = await InterviewAPI.generate(payload);
-      setQuestions(data?.questions || []);
+      const { data } = await api.post("/v1/interview/generate", form);
+      setQuestions(data?.questions || data || []);
     } catch (e) {
-      setErr(e?.response?.data?.detail || String(e));
+      console.error(e);
+      alert(e?.response?.data?.detail || "Generate failed");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <div className="bg-white border rounded-xl p-4 space-y-3">
+    <div className="grid grid-cols-12 gap-6">
+      <section className="col-span-12 xl:col-span-4 neo p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="size-5 text-[var(--brand)]" />
+          <h2 className="font-semibold text-lg">Interview Generator</h2>
+        </div>
+
+        <Field label="Title">
+          <input className="input" value={form.title} onChange={(e) => onChange("title", e.target.value)} />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          {['title','level','department'].map((k) => (
-            <div key={k}>
-              <label className="block text-sm mb-1 capitalize">{k}</label>
-              <input
-                className="w-full border rounded-md px-3 py-2"
-                value={payload[k]}
-                onChange={(e) => setPayload({ ...payload, [k]: e.target.value })}
-              />
-            </div>
-          ))}
-          <div>
-            <label className="block text-sm mb-1">Count</label>
+          <Field label="Level">
+            <input className="input" value={form.level} onChange={(e) => onChange("level", e.target.value)} />
+          </Field>
+          <Field label="Department">
+            <input className="input" value={form.department} onChange={(e) => onChange("department", e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Focus (comma separated)">
+          <input
+            className="input"
+            placeholder="e.g. system design, API, culture"
+            onChange={(e) => onChange("focus", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Count">
             <input
               type="number"
-              className="w-full border rounded-md px-3 py-2"
-              value={payload.count}
-              onChange={(e) => setPayload({ ...payload, count: Number(e.target.value) || 8 })}
+              min={3}
+              max={20}
+              className="input"
+              value={form.count}
+              onChange={(e) => onChange("count", Number(e.target.value))}
             />
-          </div>
+          </Field>
+          <Field label="Language">
+            <select className="input" value={form.language} onChange={(e) => onChange("language", e.target.value)}>
+              <option value="vi">Vietnamese</option>
+              <option value="en">English</option>
+            </select>
+          </Field>
         </div>
 
-        <div>
-          <label className="block text-sm mb-1">Focus</label>
-          <div className="flex flex-wrap gap-2">
-            {['system design','python','sql','communication','ownership'].map(f => (
-              <button
-                key={f}
-                onClick={() => toggleFocus(f)}
-                className={`px-3 py-1.5 rounded-md border ${payload.focus.includes(f) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white'}`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+        <div className="text-xs text-[var(--muted)] mt-2">Mix types</div>
+        <div className="flex flex-wrap gap-2">
+          {MIXES.map((m) => (
+            <button
+              type="button"
+              key={m}
+              className={`chip ${form.mix.includes(m) ? "ring-1 ring-[var(--brand)] text-white" : ""}`}
+              onClick={() => toggleMix(m)}
+            >
+              {m}
+            </button>
+          ))}
         </div>
 
-        <div>
-          <label className="block text-sm mb-1">Mix</label>
-          <div className="flex gap-2">
-            {['technical','behavioral','situational'].map(t => (
-              <label key={t} className="text-sm flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={payload.mix.includes(t)}
-                  onChange={() =>
-                    setPayload(p => {
-                      const has = p.mix.includes(t);
-                      return { ...p, mix: has ? p.mix.filter(x=>x!==t) : [...p.mix, t] };
-                    })
-                  }
-                />
-                {t}
-              </label>
-            ))}
-          </div>
+        <div className="pt-3">
+          <button className="btn btn-primary w-full" onClick={generate} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : "Generate"}
+          </button>
         </div>
+      </section>
 
-        <button
-          onClick={run}
-          disabled={busy}
-          className="px-4 py-2 rounded-md bg-blue-600 text-white"
-        >
-          {busy ? 'Generating…' : 'Generate Questions'}
-        </button>
-
-        {err && <div className="text-sm text-red-600">{err}</div>}
-      </div>
-
-      <div className="bg-white border rounded-xl p-4">
+      <section className="col-span-12 xl:col-span-8 neo p-5">
         <div className="font-semibold mb-3">Questions</div>
-        <ol className="space-y-2 list-decimal list-inside">
+        {!questions.length && <div className="text-[var(--muted)] text-sm">No questions yet.</div>}
+        <ol className="space-y-4">
           {questions.map((q, i) => (
-            <li key={i} className="text-sm">
-              <div className="font-medium">{q.question}</div>
-              <div className="text-xs text-gray-500">
-                {q.type} • {q.competency} • {q.difficulty}
+            <li key={i} className="neo-soft p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm uppercase tracking-wide text-[var(--muted)]">{q.type || "general"}</div>
+                <div className="text-xs chip">{q.competency || "—"} • {q.difficulty || "—"}</div>
               </div>
-              {q.rubric && <div className="text-xs mt-1">{q.rubric}</div>}
+              <div className="mt-2 font-medium">{q.question || q.text}</div>
+              {q.rubric && (
+                <div className="mt-2 text-sm text-[var(--muted)]">
+                  <b>Rubric:</b> {q.rubric}
+                </div>
+              )}
             </li>
           ))}
         </ol>
-      </div>
+      </section>
     </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <div className="text-xs mb-1 text-[var(--muted)]">{label}</div>
+      {children}
+    </label>
   );
 }

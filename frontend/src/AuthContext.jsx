@@ -1,55 +1,70 @@
-// frontend/src/AuthContext.jsx
-import { createContext, useContext, useEffect, useState } from 'react';
-import api from './api';
+// src/AuthContext.jsx
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import api from "./api";
 
-const AuthContext = createContext(null);
+const AuthCtx = createContext(null);
+export const useAuth = () => useContext(AuthCtx);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const fetchMe = async () => {
-    try {
-      const { data } = await api.get('/auth/me');
-      setUser(data);
-    } catch {
-      setUser(null);
-    } finally {
-      setInitializing(false);
-    }
-  };
-
+  // Khôi phục token ngay lập tức -> tránh bị redirect sớm
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) fetchMe();
-    else setInitializing(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const t = localStorage.getItem("access_token");
+    if (t) {
+      setIsAuthenticated(true);
+      api.defaults.headers.common.Authorization = `Bearer ${t}`;
+      (async () => {
+        try {
+          const { data } = await api.get("/auth/me");
+          setUser(data);
+        } catch {
+          localStorage.removeItem("access_token");
+          delete api.defaults.headers.common.Authorization;
+          setIsAuthenticated(false);
+          setUser(null);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const login = async (username, password) => {
-    const body = new URLSearchParams();
-    body.append('username', username);
-    body.append('password', password);
+  const login = useCallback(async (username, password) => {
+    // FastAPI OAuth2 (x-www-form-urlencoded)
+    const form = new URLSearchParams();
+    form.append("username", username);
+    form.append("password", password);
+    form.append("grant_type", "password");
 
-    const { data } = await api.post('/auth/token', body, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    const { data } = await api.post("/auth/token", form, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
-    localStorage.setItem('access_token', data.access_token);
-    await fetchMe();
-    return data;
-  };
+    const token = data.access_token;
+    localStorage.setItem("access_token", token);
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
+    const me = await api.get("/auth/me");
+    setUser(me.data);
+    setIsAuthenticated(true);
+    return me.data;
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem("access_token");
+    delete api.defaults.headers.common.Authorization;
     setUser(null);
-  };
+    setIsAuthenticated(false);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, initializing, login, logout }}>
+    <AuthCtx.Provider value={{ user, isAuthenticated, loading, login, logout }}>
       {children}
-    </AuthContext.Provider>
+    </AuthCtx.Provider>
   );
 }
-
-export const useAuth = () => useContext(AuthContext);

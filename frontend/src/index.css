@@ -1,34 +1,58 @@
+/* đặt @import lên đầu */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Neumorphism helpers */
-:root {
-  --neo-bg: #f4f6fa;
-  --neo-dark: #d9dce2;
-  --neo-light: #ffffff;
+:root{
+  /* Palette tối giản, dịu mắt */
+  --bg:        #0a1020;
+  --panel:     #0e1629;
+  --panel-2:   #111b31;
+  --text:      #e9edf6;
+  --muted:     #9aa6bf;
+  --brand:     #6d8dff;   /* xanh chàm */
+  --accent:    #1dd1e5;   /* teal */
+  --ring:      rgba(255,255,255,.06);
+  --shadow-dk: rgba(4,6,14,.6);
+  --shadow-lt: rgba(255,255,255,.045);
 }
 
-body {
-  @apply bg-[var(--neo-bg)] text-ink antialiased;
+html, body, #root { height: 100%; }
+body{
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: var(--text);
+  background: radial-gradient(1200px 700px at -10% -10%, rgba(109,141,255,.08), transparent 55%),
+              radial-gradient(1100px 600px at 110% -10%, rgba(29,209,229,.08), transparent 55%),
+              linear-gradient(180deg, #0a0f1d 0%, #0b1324 60%, #0c1427 100%);
 }
 
-/* Reusable utilities */
-.neo {
-  box-shadow: 10px 10px 24px var(--neo-dark), -10px -10px 24px var(--neo-light);
-  border-radius: 1rem;
-  background: var(--neo-bg);
-}
-
-.btn-primary {
-  @apply inline-flex items-center justify-center rounded-xl px-4 py-2 font-medium text-white bg-primary hover:opacity-90 transition;
-  box-shadow: 0 8px 24px rgba(79,142,247,.35);
-}
-
-.card {
-  @apply neo p-5;
-}
-
-.pill {
-  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100;
+@layer components{
+  .neo{ /* card chủ đạo */
+    background: var(--panel);
+    border-radius: 18px;
+    box-shadow: 12px 12px 28px var(--shadow-dk), -8px -8px 20px var(--shadow-lt);
+    border: 1px solid var(--ring);
+  }
+  .neo-soft{ /* card phụ */
+    background: var(--panel-2);
+    border-radius: 16px;
+    box-shadow: 8px 8px 20px var(--shadow-dk), -6px -6px 16px var(--shadow-lt);
+    border: 1px solid var(--ring);
+  }
+  .chip{
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-[var(--panel-2)] border border-[var(--ring)];
+  }
+  .btn{
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium border border-[var(--ring)] transition;
+    background: linear-gradient(180deg, #121c35, #0e172b);
+  }
+  .btn-primary{
+    background: linear-gradient(180deg, #7b96ff, #5a79ff);
+    color: #081022;
+  }
+  .input{
+    @apply w-full rounded-md px-3 py-2 text-sm border border-[var(--ring)] bg-[var(--panel-2)] outline-none;
+  }
 }

@@ -1,23 +1,34 @@
-import forms from '@tailwindcss/forms';
-
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+// tailwind.config.cjs
+module.exports = {
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: '#0F172A',
-        primary: '#4F8EF7',
-        soft: '#EEF2FF'
+        bg: "#0b1220",
+        card: "#0e1627",
+        primary: "#6d8dff",
+        accent: "#22d3ee",
+        text: "#e5e7eb",
+        muted: "#9aa4b2",
+        success: "#22c55e",
+        danger: "#ef4444",
+        warning: "#f59e0b",
+      },
+      fontFamily: {
+        display: ["Inter", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        neo: '10px 10px 24px #e5e7eb, -10px -10px 24px #ffffff',
-        ring: '0 8px 24px rgba(79,142,247,0.35)'
+        "neo-lg":
+          "16px 16px 32px rgba(0,0,0,.55), -14px -14px 30px rgba(255,255,255,.04)",
+        "neo":
+          "12px 12px 24px rgba(0,0,0,.5), -10px -10px 22px rgba(255,255,255,.04)",
+        "neo-sm":
+          "8px 8px 16px rgba(0,0,0,.45), -6px -6px 14px rgba(255,255,255,.04)",
+        inset:
+          "inset 6px 6px 14px rgba(0,0,0,.45), inset -6px -6px 14px rgba(255,255,255,.04)",
       },
-      borderRadius: {
-        xl2: '1rem'
-      }
-    }
+      borderRadius: { neo: "18px" },
+    },
   },
-  plugins: [forms]
+  plugins: [require("@tailwindcss/forms"), require("@tailwindcss/typography")],
 };

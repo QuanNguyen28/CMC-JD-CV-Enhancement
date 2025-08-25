@@ -1,32 +1,26 @@
-import { Icon } from "@iconify/react";
-import NeomorphCard from "./NeomorphCard";
 import { useAuth } from "../AuthContext";
+import { LogOut, Search } from "lucide-react";
 
-export default function Topbar(){
+export default function Topbar() {
   const { user, logout } = useAuth();
   return (
-    <div className="sticky top-0 z-20 px-6 pt-6">
-      <NeomorphCard className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
-          <Icon icon="solar:home-2-bold-duotone" className="text-primary" width="22"/>
-          <span className="font-semibold">SmartHire Composer</span>
-          <span className="pill ml-2">Dashboard</span>
+    <div className="flex items-center gap-4">
+      <div className="relative max-w-xl w-full">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--muted)]" />
+        <input className="input pl-9" placeholder="Quick search…" />
+      </div>
+
+      <div className="ml-auto chip">
+        <div className="size-6 rounded-full grid place-items-center bg-[var(--brand)] text-[#0b1222] text-xs font-bold">
+          {user?.full_name?.[0] ?? "A"}
         </div>
-        <div className="flex items-center gap-3">
-          <button className="neo px-3 py-2 hover:shadow-ring transition-shadow">
-            <Icon icon="solar:bell-bing-bold-duotone" width="20"/>
-          </button>
-          <div className="flex items-center gap-3 neo px-3 py-2">
-            <img className="w-8 h-8 rounded-full object-cover"
-              src={`https://i.pravatar.cc/96?u=${user?.username||"guest"}`} />
-            <div className="text-sm leading-tight">
-              <div className="font-semibold">{user?.full_name||"Guest"}</div>
-              <div className="text-muted text-xs">{user?.roles?.[0]||"viewer"}</div>
-            </div>
-            <button onClick={logout} className="ml-2 text-danger hover:underline text-sm">Logout</button>
-          </div>
-        </div>
-      </NeomorphCard>
+        <span>{user?.full_name ?? "User"}</span>
+        <span className="opacity-60">({user?.roles?.[0] ?? "member"})</span>
+      </div>
+
+      <button className="btn" onClick={logout}>
+        <LogOut className="size-4" /> Logout
+      </button>
     </div>
   );
 }
