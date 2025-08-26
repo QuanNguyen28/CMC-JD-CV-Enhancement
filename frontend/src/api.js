@@ -55,12 +55,11 @@ export const JDAPI = {
     const { data } = await api.get(`/v1/jd/version-history/${jdId}`);
     return data; // [{version_number|version, content_md, edited_by|updated_by, edited_at|updated_at}]
   },
-  async export(jdId, format = 'pdf') {
-    const { data } = await api.get(`/v1/jd/export/${jdId}`, {
-      params: { format },
+  async exportJD(jdId, format = 'pdf') {
+    const res = await api.get(`/v1/jd/export/${jdId}?format=${format}`, {
       responseType: 'blob',
     });
-    return data; // Blob
+    return res.data; // blob
   },
 };
 

@@ -21,3 +21,4 @@ python-jose[cryptography]
 bcrypt
 python-multipart
 reportlab
+pydantic[email]

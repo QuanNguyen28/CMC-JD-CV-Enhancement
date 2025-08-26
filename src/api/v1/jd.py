@@ -1,6 +1,6 @@
 # src/api/v1/jd.py
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Query
 from typing import List
 from sqlalchemy.orm import Session
 
@@ -12,13 +12,34 @@ from src.services.llm_prompt_orchestrator import generate_jd_text
 from src.services.jd_versioning_service import get_versions, update_jd
 from src.services.export_bridge import export_jd_file
 
+from embeddings.utils.gemini_embed import embed_text
+from src.services.retriever_service import retrieve_with_snippet
+
 router = APIRouter(prefix="/v1/jd", tags=["JD"])
+
+def _format_chunks_text(chunks, max_chars: int = 3500) -> str:
+    """
+    Join snippet/metadata into a compact context block for the LLM prompt.
+    """
+    lines = []
+    for i, c in enumerate(chunks, 1):
+        head = f"[{i}] JD#{getattr(c, 'jd_id', 0)} – chunk#{getattr(c, 'chunk_index', 0)} (score={getattr(c, 'score', 0.0):.3f})"
+        body = (getattr(c, 'snippet', None) or "").strip()
+        if not body:
+            # fallback: put metadata so LLM still knows the source
+            body = f"(No snippet; source_path={getattr(c, 'object_path', None) or 'N/A'})"
+        lines.append(head + "\n" + body)
+    text = "\n\n".join(lines)
+    return text[:max_chars]
 
 @router.post("/generate", response_model=JDGenerateResponse)
 def create_jd_endpoint(
     req: JDGenerateRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("recruiter", "admin"))
+    current_user=Depends(require_roles("recruiter", "admin")),
+    use_rag: bool = Query(True, description="Use Milvus RAG for prompt enrichment"),
+    top_k: int = Query(5, ge=1, le=20, description="Top-K similar chunks"),
+    snippet_lines: int = Query(12, ge=1, le=100, description="Lines to preview from each chunk file")
 ):
     """
     Generate a new Job Description via LLM, store the JD record, and record its version.
@@ -31,16 +52,46 @@ def create_jd_endpoint(
         jd_id = create_jd(db, req=req, created_by=current_user.username, family_id=family_id)
 
         # Prepare metadata for LLM (+ optional RAG chunks)
-        chunks_list = (req.chunks or []) if hasattr(req, "chunks") else []
-        chunks_text = "\n\n---\n".join([c.strip() for c in chunks_list if c and str(c).strip()])
+        # 1) User-provided chunks (if any)
+        user_chunks_list = (req.chunks or []) if hasattr(req, "chunks") else []
+        user_chunks_text = "\n\n---\n".join([str(c).strip() for c in user_chunks_list if c and str(c).strip()])
+
+        # 2) RAG from Milvus
+        rag_chunks_text = ""
+        if use_rag:
+            # Build semantic query from request fields
+            q_parts = [req.title or ""]
+            if getattr(req, "department", None):
+                q_parts.append(req.department)
+            level_val = getattr(req, "level", None) or getattr(req, "seniority", None)
+            if level_val:
+                q_parts.append(level_val)
+            if getattr(req, "job_family", None):
+                q_parts.append(req.job_family)
+            query = " | ".join([p for p in q_parts if p]).strip()
+
+            if query:
+                try:
+                    vec = embed_text([query])[0]  # 1-D embedding vector
+                    hits = retrieve_with_snippet(vec, top_k=top_k, snippet_lines=snippet_lines)
+                    rag_chunks_text = _format_chunks_text(hits)
+                except Exception as e:
+                    # Non-fatal: continue without RAG if vector search fails
+                    rag_chunks_text = ""
+
+        # 3) Merge both (user chunks first, then RAG)
+        chunks_text_parts = [s for s in [user_chunks_text, rag_chunks_text] if s]
+        chunks_text = "\n\n---\n".join(chunks_text_parts)
 
         metadata = req.model_dump() if hasattr(req, "model_dump") else req.dict()
         metadata.update({
             "jd_id": jd_id,
             "created_by": current_user.username,
             "family_id": family_id,
-            "chunks": chunks_list,
+            "chunks": user_chunks_list,
             "chunks_text": chunks_text,
+            # keep both keys for template compatibility
+            "level": getattr(req, "level", None) or getattr(req, "seniority", None) or "",
         })
 
         # Generate content and record version

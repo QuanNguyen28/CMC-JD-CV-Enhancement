@@ -2,7 +2,7 @@ import { useState } from "react";
 import api from "../api";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { FileText, Save, History } from "lucide-react";
+import { FileText, Save, History, Download } from "lucide-react";
 
 export default function ComposePage() {
   const [form, setForm] = useState({
@@ -18,6 +18,7 @@ export default function ComposePage() {
   const [version, setVersion] = useState(null);
   const [content, setContent] = useState("");
   const [versions, setVersions] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   const onChange = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
@@ -52,6 +53,36 @@ export default function ComposePage() {
       alert(e?.response?.data?.detail || "Update failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function downloadBlob(data, filename) {
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function exportJD(format = "pdf") {
+    if (!jdId) return;
+    setExporting(true);
+    try {
+      const res = await api.get(`/v1/jd/export/${jdId}`, {
+        params: { format },
+        responseType: "blob",
+      });
+      const safeTitle = (form.title || `jd-${jdId}`).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "");
+      const filename = `${safeTitle}-v${version || ""}.${format}`;
+      downloadBlob(res.data, filename);
+    } catch (e) {
+      console.error(e);
+      alert(e?.response?.data?.detail || "Export failed");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -91,13 +122,31 @@ export default function ComposePage() {
           </div>
         </div>
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
           <button className="btn btn-primary" onClick={generateJD} disabled={loading}>
             {loading ? "Generating…" : "Generate"}
           </button>
           <button className="btn" onClick={saveNewVersion} disabled={!jdId || loading}>
-            <Save className="size-4" /> Save new version
+            <Save className="size-4" /> Save version
           </button>
+          <div className="ml-auto flex gap-2">
+            <button
+              className="btn"
+              onClick={() => exportJD("pdf")}
+              disabled={!jdId || exporting}
+              title={!jdId ? "Generate or load a JD first" : "Export as PDF"}
+            >
+              <Download className="size-4" /> {exporting ? "Exporting…" : "PDF"}
+            </button>
+            <button
+              className="btn"
+              onClick={() => exportJD("docx")}
+              disabled={!jdId || exporting}
+              title={!jdId ? "Generate or load a JD first" : "Export as DOCX"}
+            >
+              <Download className="size-4" /> {exporting ? "Exporting…" : "DOCX"}
+            </button>
+          </div>
         </div>
 
         <div className="neo-soft p-3 text-xs text-[var(--muted)]">
@@ -111,7 +160,7 @@ export default function ComposePage() {
           </div>
           <ul className="space-y-1 text-sm max-h-56 overflow-auto pr-1">
             {(versions || []).map((v) => (
-              <li key={`${v.version_number}-${v.edited_at}`} className="flex items-center justify-between border-b border-[var(--ring)]/60 py-1">
+              <li key={`${v.version_number}-${v.edited_at || v.updated_at || v.version_number}`} className="flex items-center justify-between border-b border-[var(--ring)]/60 py-1">
                 <span>v{v.version_number}</span>
                 <span className="text-[var(--muted)]">{new Date(v.edited_at).toLocaleString()}</span>
                 <span className="text-[var(--muted)]">{v.edited_by}</span>
@@ -137,7 +186,7 @@ export default function ComposePage() {
 
           <div className="flex flex-col">
             <div className="text-sm text-[var(--muted)] mb-2">Preview</div>
-            <div className="neo-soft p-4 overflow-auto prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+            <div className="h-full overflow-auto border border-[var(--ring)] rounded-lg p-3 prose prose-invert" dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         </div>
       </section>

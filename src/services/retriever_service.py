@@ -2,6 +2,7 @@
 from typing import List, Optional
 from pydantic import BaseModel
 from pymilvus import connections, Collection
+from src.schemas.retriever import RetrieveSimilarReq, RetrieveReq, ChunkResult
 from src.core.config import MILVUS_HOST, MILVUS_PORT, MILVUS_COLLECTION
 import os
 
@@ -24,7 +25,6 @@ OUTPUT_FIELDS = BASE_FIELDS + ([PATH_FIELD] if PATH_FIELD else [])
 
 def _safe_get(hit, key: str):
     try:
-        # với pymilvus v2.3/2.4: hit.entity.get / hit.fields
         if hasattr(hit, "entity") and hit.entity is not None:
             return hit.entity.get(key)
         if hasattr(hit, "fields") and hit.fields is not None:
@@ -32,23 +32,6 @@ def _safe_get(hit, key: str):
     except Exception:
         pass
     return None
-
-class RetrieveSimilarReq(BaseModel):
-    query: str
-    top_k: int = 5
-
-class RetrieveReq(BaseModel):
-    query: str
-    top_k: int = 5
-    snippet_lines: int = 8   # số dòng đọc làm snippet (nếu có đường dẫn local)
-
-class ChunkResult(BaseModel):
-    chunk_id: str
-    jd_id: int
-    chunk_index: int
-    score: float
-    object_path: Optional[str] = None
-    snippet: Optional[str] = None
 
 def _search_vectors(query_vec: List[float], top_k: int):
     # ưu tiên COSINE; nếu server không hỗ trợ thì dùng IP
