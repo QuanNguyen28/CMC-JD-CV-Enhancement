@@ -56,7 +56,7 @@ export default function AISidebar({
       <div className="mt-4 space-y-3 overflow-auto max-h-[70vh] pr-1">
         {items.length === 0 && !loading && (
           <p className="text-sm text-slate-500">
-            Chọn mode & bấm <b>Generate</b> để nhận gợi ý theo ngữ cảnh.
+            Select a mode & click <b>Generate</b> to get contextual suggestions from current content.
           </p>
         )}
         {items.map((s, idx) => (

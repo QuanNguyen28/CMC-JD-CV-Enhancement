@@ -6,6 +6,7 @@ from jose import JWTError, jwt
 from src.db.session import SessionLocal
 from src.crud.auth_crud import get_user
 from src.core.config import JWT_SECRET_KEY, ALGORITHM
+from fastapi import Request, Query
 
 # Swagger sẽ hiển thị form login dựa vào tokenUrl này
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
@@ -52,3 +53,16 @@ def require_roles(*allowed: str):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
         return current_user
     return _dep
+
+def get_lang(request: Request, lang: str | None = Query(None)) -> str:
+    """
+    Lấy ngôn ngữ từ query ?lang= hoặc header X-Gen-Lang.
+    Chuẩn hoá về 'en' | 'vi' (mặc định 'vi').
+    """
+    h = request.headers.get("X-Gen-Lang")
+    raw = (lang or h or "").strip().lower()
+    if raw in ("en", "en-us", "english"):
+        return "en"
+    if raw in ("vi", "vn", "vi-vn", "vietnamese", "tiếng việt"):
+        return "vi"
+    return "vi"

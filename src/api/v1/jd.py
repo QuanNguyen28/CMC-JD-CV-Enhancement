@@ -5,7 +5,7 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from src.schemas.jd import JDGenerateRequest, JDGenerateResponse, JDVersionResponse, JDUpdateRequest
-from src.api.dependencies import get_db, require_roles
+from src.api.dependencies import get_db, require_roles, get_lang
 from src.crud.jd_crud import create_jd
 from src.services.role_taxonomy_mapper import get_or_create_family
 from src.services.llm_prompt_orchestrator import generate_jd_text
@@ -15,7 +15,7 @@ from src.services.export_bridge import export_jd_file
 from embeddings.utils.gemini_embed import embed_text
 from src.services.retriever_service import retrieve_with_snippet
 from fastapi.responses import StreamingResponse
-from src.schemas.jd_live import (
+from src.schemas.jd import (
     JDImproveRequest, JDImproveResponse,
     JDSuggestRequest, JDSuggestResponse
 )
@@ -46,6 +46,7 @@ def create_jd_endpoint(
     req: JDGenerateRequest,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("recruiter", "admin")),
+    lang: str = Depends(get_lang),
     use_rag: bool = Query(True, description="Use Milvus RAG for prompt enrichment"),
     top_k: int = Query(5, ge=1, le=20, description="Top-K similar chunks"),
     snippet_lines: int = Query(12, ge=1, le=100, description="Lines to preview from each chunk file")
@@ -84,7 +85,7 @@ def create_jd_endpoint(
                     vec = embed_text([query])[0]  # 1-D embedding vector
                     hits = retrieve_with_snippet(vec, top_k=top_k, snippet_lines=snippet_lines)
                     rag_chunks_text = _format_chunks_text(hits)
-                except Exception as e:
+                except Exception:
                     # Non-fatal: continue without RAG if vector search fails
                     rag_chunks_text = ""
 
@@ -101,10 +102,12 @@ def create_jd_endpoint(
             "chunks_text": chunks_text,
             # keep both keys for template compatibility
             "level": getattr(req, "level", None) or getattr(req, "seniority", None) or "",
+            "language": lang,
+            "lang": lang,
         })
 
-        # Generate content and record version
-        content_md, version_number = generate_jd_text(metadata, db)
+        # Generate content and record version (pass lang through)
+        content_md, version_number = generate_jd_text(metadata, db, lang=lang)
 
         return JDGenerateResponse(jd_id=jd_id, content_md=content_md, version=version_number)
 
@@ -183,27 +186,26 @@ def export_jd(
 def improve_jd_endpoint(
     req: JDImproveRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("recruiter", "admin"))
+    current_user=Depends(require_roles("recruiter", "admin")),
+    lang: str = Depends(get_lang),
 ):
     """
     Cải thiện toàn văn JD theo chỉ dẫn. Có thể lưu thành version mới nếu `create_new_version=True`.
     """
     try:
-        improved = improve_jd(req.content_md, req.instruction, req.language)
+        target_lang = (req.language or lang or "vi").lower()
+        improved = improve_jd(req.content_md, req.instruction or "", target_lang)
+
         ver = None
-        if req.create_new_version:
-            # Cần jd_id để lưu; nếu client không gửi jd_id thì bỏ qua lưu version.
-            # Gợi ý: client gửi kèm jd_id trong query hoặc body nếu muốn lưu.
-            # Ở đây mình thử lấy jd_id từ phần header tạm (tuỳ bạn thay đổi).
-            jd_id = None
-            # Nếu muốn chuẩn, hãy thêm jd_id vào JDImproveRequest và dùng ở đây.
+        if getattr(req, "create_new_version", False):
+            jd_id = getattr(req, "jd_id", None)
             if jd_id:
                 ver = record_jd_version(
                     db,
                     jd_id=jd_id,
                     content_md=improved,
                     updated_by=current_user.username,
-                    change_summary="improve via /v1/jd/improve"
+                    change_summary=f"improve via /v1/jd/improve (lang={target_lang})"
                 )
         return JDImproveResponse(content_md=improved, version=ver)
     except Exception as e:
@@ -213,18 +215,20 @@ def improve_jd_endpoint(
 def suggest_jd_endpoint(
     req: JDSuggestRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("recruiter", "admin"))
+    current_user=Depends(require_roles("recruiter", "admin")),
+    lang: str = Depends(get_lang),
 ):
     """
     Gợi ý bullets/đoạn cho một section cụ thể.
     Có thể truyền thêm chunks_text (đã ghép sẵn từ RAG) để LLM bám theo.
     """
     try:
+        target_lang = (req.language or lang or "vi").lower()
         out = suggest_jd_section(
             content_md=req.content_md,
             section=req.section or "",
             goal=req.goal or "",
-            language=req.language or "vi",
+            language=target_lang,
             chunks_text=req.chunks_text or "",
         )
         return JDSuggestResponse(suggestions=out["bullets"], rationale=out.get("rationale"))
@@ -235,14 +239,16 @@ def suggest_jd_endpoint(
 def improve_stream(
     req: JDImproveRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("recruiter", "admin"))
+    current_user=Depends(require_roles("recruiter", "admin")),
+    lang: str = Depends(get_lang),
 ):
     """
     SSE endpoint “giả streaming” (server chunk) để hiển thị live suggestion.
     Client: fetch('/v1/jd/improve/stream', {method:'POST', body:..., headers:{'Accept':'text/event-stream'}})
     """
     try:
-        improved = improve_jd(req.content_md, req.instruction, req.language)
+        target_lang = (req.language or lang or "vi").lower()
+        improved = improve_jd(req.content_md, req.instruction or "", target_lang)
         return StreamingResponse(fake_streaming(improved), media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Improve stream failed: {e}")

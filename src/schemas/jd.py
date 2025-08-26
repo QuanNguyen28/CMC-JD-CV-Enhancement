@@ -8,8 +8,8 @@ class JDGenerateRequest(BaseModel):
     department: Optional[str] = None
     level: Optional[str] = None
     job_family: Optional[str] = None
-    # NEW: optional context chunks for RAG
-    chunks: Optional[List[str]] = []
+    language: str = "vi"
+    chunks_text: Optional[str] = None
 
 class JDUpdateRequest(BaseModel):
     jd_id: int
@@ -27,3 +27,26 @@ class JDGenerateResponse(BaseModel):
     jd_id: int
     content_md: str
     version: int
+
+class JDSuggestRequest(BaseModel):
+    content_md: str
+    section: Optional[str] = "Responsibilities"
+    goal: Optional[str] = ""
+    language: str = "vi"
+    chunks_text: Optional[str] = ""
+
+class JDImproveRequest(BaseModel):
+    content_md: str
+    instruction: Optional[str] = (
+        "Improve clarity, structure, and tone; keep Markdown; preserve facts."
+    )
+    language: str = "vi"
+    create_new_version: bool = False 
+
+class JDImproveResponse(BaseModel):
+    content_md: str
+    version: Optional[int] = None
+
+class JDSuggestResponse(BaseModel):
+    suggestions: List[str]
+    rationale: Optional[str] = None

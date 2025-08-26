@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense } from "react";
 import { AuthProvider } from "./AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
@@ -16,24 +17,39 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Public */}
-          <Route path="/login" element={<LoginPage />} />
+        <Suspense
+          fallback={
+            <div className="min-h-screen grid place-items-center text-gray-500">
+              Loading…
+            </div>
+          }
+        >
+          <Routes>
+            {/* Public */}
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Private + Layout có Outlet */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="compose" element={<ComposePage />} />
-              <Route path="interview" element={<InterviewPage />} />
-              <Route path="retrieve" element={<RetrievePage />} />
-              <Route path="roles" element={<Roles />} />
+            {/* Private area */}
+            <Route element={<ProtectedRoute />}> 
+              <Route path="/" element={<Layout />}> 
+                {/* default landing */}
+                <Route index element={<Dashboard />} />
+                {/* explicit alias */}
+                <Route path="dashboard" element={<Dashboard />} />
+
+                <Route path="compose" element={<ComposePage />} />
+                <Route path="interview" element={<InterviewPage />} />
+                <Route path="retrieve" element={<RetrievePage />} />
+                <Route path="roles" element={<Roles />} />
+
+                {/* in-layout 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            {/* top-level fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

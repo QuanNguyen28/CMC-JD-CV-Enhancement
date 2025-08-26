@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import api from "../api";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { FileText, Save, History, Download, Wand2, Lightbulb } from "lucide-react";
+import { FileText, Save, History, Download, Wand2, Lightbulb, ChevronDown, ChevronRight } from "lucide-react";
+
 
 /**
  * ComposePage
@@ -23,6 +24,9 @@ export default function ComposePage() {
     location: "",
   });
 
+  // Language control
+  const [lang, setLang] = useState("vi");
+
   const [loading, setLoading] = useState(false);
   const [jdId, setJdId] = useState(null);
   const [version, setVersion] = useState(null);
@@ -34,8 +38,12 @@ export default function ComposePage() {
   const [suggesting, setSuggesting] = useState(false);
   const [suggestMode, setSuggestMode] = useState("outline"); // outline | bullets | rewrite
   const [suggestions, setSuggestions] = useState([]);
+  const [suggOpen, setSuggOpen] = useState(true);
 
   const onChange = (k, v) => setForm((s) => ({ ...s, [k]: v }));
+
+  // Add language header for backend
+  const headersWithLang = useMemo(() => ({ "X-Gen-Lang": lang }), [lang]);
 
   // --- Textarea ref for insert-at-caret ---
   const editorRef = useRef(null);
@@ -62,7 +70,8 @@ export default function ComposePage() {
   async function generateJD() {
     setLoading(true);
     try {
-      const { data } = await api.post("/v1/jd/generate", form);
+      const payload = { ...form, language: lang };
+      const { data } = await api.post("/v1/jd/generate", payload);
       setJdId(data.jd_id);
       setVersion(data.version);
       setContent(data.content_md || "");
@@ -83,7 +92,10 @@ export default function ComposePage() {
     if (!jdId) return;
     setLoading(true);
     try {
-      await api.put("/v1/jd/update", { jd_id: jdId, content_md: content });
+      await api.put(
+        "/v1/jd/update",
+        { jd_id: jdId, content_md: content, change_summary: "manual edit" }
+      );
       const his = await api.get(`/v1/jd/version-history/${jdId}`);
       setVersions(his.data || []);
       // optimistic: if BE returns nothing, bump local
@@ -135,15 +147,13 @@ export default function ComposePage() {
     setLoading(true);
     try {
       const payload = {
-        jd_id: jdId || 0,
         content_md: content,
-        style: "concise",
-        change_summary: "improve from UI",
+        instruction: "Polish for clarity, keep Markdown, concise and consistent tone.",
+        language: lang,
       };
       const { data } = await api.post("/v1/jd/improve", payload);
-      // Expect: { content_md, version }
       if (data?.content_md) setContent(data.content_md);
-      if (data?.version) setVersion(data.version);
+      // version may or may not be returned; refresh history if we have a jdId
       if (jdId) {
         const his = await api.get(`/v1/jd/version-history/${jdId}`);
         setVersions(his.data || []);
@@ -156,26 +166,75 @@ export default function ComposePage() {
     }
   }
 
+  // Normalize various backend shapes into a string[] of bullets
+  function normalizeBullets(payload) {
+    if (!payload) return [];
+    // direct array
+    if (Array.isArray(payload)) {
+      return payload.map((s) => String(s).trim()).filter(Boolean);
+    }
+    // common wrapped keys
+    if (Array.isArray(payload.bullets)) {
+      return payload.bullets.map((s) => String(s).trim()).filter(Boolean);
+    }
+    if (Array.isArray(payload.suggestions)) {
+      return payload.suggestions.map((s) => String(s).trim()).filter(Boolean);
+    }
+    // text-like fields
+    let text = "";
+    if (typeof payload === "string") text = payload;
+    else if (typeof payload.text === "string") text = payload.text;
+    else if (typeof payload.content === "string") text = payload.content;
+    else if (typeof payload.message === "string") text = payload.message;
+
+    text = String(text || "");
+    if (!text) return [];
+
+    // split lines, strip leading bullets/dots, remove empties
+    return text
+      .split(/\r?\n+/)
+      .map((line) => line.replace(/^\s*[-*•]\s?/, "").trim())
+      .filter(Boolean);
+  }
+
   // --- Suggest (LLM) ---
   async function fetchSuggestions() {
     setSuggesting(true);
     try {
+      // ensure panel is open so user sees results
+      setSuggOpen(true);
+
+      let section = "Responsibilities";
+      let goal = "Suggest 6–10 concise bullets aligned with the current JD.";
+      if (suggestMode === "outline") {
+        section = "Outline";
+        goal = "Propose a clean JD outline (headings) that fits this role.";
+      } else if (suggestMode === "rewrite") {
+        section = "Summary";
+        goal = "Rewrite the summary for clarity and impact (3–5 short paragraphs).";
+      }
+
       const payload = {
-        title: form.title,
-        department: form.department,
-        job_family: form.job_family,
-        level: form.level,
-        current_md: content,
-        cursor_section: "",  // optionally set current heading user is in
-        mode: suggestMode,   // outline | bullets | rewrite
-        rag_context: null,   // set if you have RAG results on UI
-        max_tokens: 512,
+        content_md: content || "",
+        section,
+        goal,
+        language: lang,
+        chunks_text: null, // optionally pass RAG context here
       };
+
       const { data } = await api.post("/v1/jd/suggest", payload);
-      setSuggestions(data?.suggestions || []);
+      const bullets = normalizeBullets(data);
+      setSuggestions(bullets);
+
+      // If nothing returned, show a gentle hint instead of blank area
+      if (!bullets.length) {
+        console.warn("Suggest API returned no items. Raw payload:", data);
+      }
     } catch (e) {
       console.error(e);
-      setSuggestions([]);
+      setSuggestions([
+        "⚠️ Could not fetch suggestions. Please try again.",
+      ]);
       alert(e?.response?.data?.detail || "Suggest failed");
     } finally {
       setSuggesting(false);
@@ -194,6 +253,16 @@ export default function ComposePage() {
         </div>
 
         <div className="space-y-3">
+          <Field label="Language">
+            <select
+              className="input"
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+            >
+              <option value="vi">Tiếng Việt</option>
+              <option value="en">English</option>
+            </select>
+          </Field>
           <Field label="Title">
             <input
               className="input"
@@ -313,14 +382,14 @@ export default function ComposePage() {
       </section>
 
       {/* Right: Editor + Preview + Suggestions */}
-      <section className="col-span-12 xl:col-span-8 grid grid-rows-[auto_1fr_auto] gap-6">
+      <section className="col-span-12 xl:col-span-8 flex flex-col gap-6">
         {/* Editor & Preview */}
-        <div className="neo p-4 grid grid-cols-2 gap-4 min-h-[520px]">
+        <div className="neo p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col">
             <div className="text-sm text-[var(--muted)] mb-2">Markdown</div>
             <textarea
               ref={editorRef}
-              className="input h-full resize-none"
+              className="input h-[520px] md:h-[560px] resize-y"
               placeholder="Write or edit JD in Markdown…"
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -330,51 +399,64 @@ export default function ComposePage() {
           <div className="flex flex-col">
             <div className="text-sm text-[var(--muted)] mb-2">Preview</div>
             <div
-              className="h-full overflow-auto border border-[var(--ring)] rounded-lg p-4 prose prose-slate max-w-none"
+              className="h-[520px] md:h-[560px] overflow-auto border border-[var(--ring)] rounded-lg p-4 prose prose-slate max-w-none bg-white/5"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           </div>
         </div>
 
-        {/* AI Suggestions */}
+        {/* AI Suggestions (collapsible, fixed height) */}
         <div className="neo p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Lightbulb className="size-4 text-amber-500" />
-            <div className="font-medium">AI Suggestions</div>
-            <select
-              className="ml-auto input !py-1 !h-9 !text-sm w-40"
-              value={suggestMode}
-              onChange={(e) => setSuggestMode(e.target.value)}
-            >
-              <option value="outline">Outline</option>
-              <option value="bullets">Bullets</option>
-              <option value="rewrite">Rewrite</option>
-            </select>
-            <button className="btn" onClick={fetchSuggestions} disabled={suggesting}>
-              {suggesting ? "Generating…" : "Generate"}
-            </button>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-3">
-            {suggestions.length === 0 && !suggesting && (
-              <div className="text-sm text-[var(--muted)]">
-                Chọn chế độ và bấm <b>Generate</b> để nhận gợi ý theo ngữ cảnh từ nội dung hiện tại.
-              </div>
+          <button
+            type="button"
+            onClick={() => setSuggOpen((v) => !v)}
+            className="w-full flex items-center gap-2 text-left"
+            aria-expanded={suggOpen}
+          >
+            {suggOpen ? (
+              <ChevronDown className="size-4 text-amber-500" />
+            ) : (
+              <ChevronRight className="size-4 text-amber-500" />
             )}
-            {suggestions.map((s, idx) => (
-              <div
-                key={`${idx}-${s.slice(0, 16)}`}
-                className="p-3 rounded-xl border border-[var(--ring)] bg-white/90 hover:shadow-sm transition"
+            <span className="font-medium">AI Suggestions</span>
+            <div className="ml-auto flex items-center gap-2">
+              <select
+                className="input !py-1 !h-9 !text-sm w-40"
+                value={suggestMode}
+                onChange={(e) => setSuggestMode(e.target.value)}
               >
-                <pre className="whitespace-pre-wrap text-sm">{s}</pre>
-                <div className="text-right mt-2">
-                  <button className="btn" onClick={() => insertAtCaret(s)}>
-                    Insert
-                  </button>
+                <option value="outline">Outline</option>
+                <option value="bullets">Bullets</option>
+                <option value="rewrite">Rewrite</option>
+              </select>
+              <button className="btn" onClick={fetchSuggestions} disabled={suggesting}>
+                {suggesting ? "Generating…" : "Generate"}
+              </button>
+            </div>
+          </button>
+
+          {suggOpen && (
+            <div className="mt-3 grid md:grid-cols-2 gap-3 max-h-[260px] overflow-auto pr-1">
+              {suggestions.length === 0 && !suggesting && (
+                <div className="text-sm text-[var(--muted)]">
+                  Select a mode and click <b>Generate</b> to receive contextual suggestions based on the current content.
                 </div>
-              </div>
-            ))}
-          </div>
+              )}
+              {suggestions.map((s, idx) => (
+                <div
+                  key={`${idx}-${s.slice(0, 16)}`}
+                  className="p-3 rounded-xl border border-[var(--ring)] bg-white/90 dark:bg-white/5 hover:shadow-sm transition"
+                >
+                  <pre className="whitespace-pre-wrap text-sm">{s}</pre>
+                  <div className="text-right mt-2">
+                    <button className="btn" onClick={() => insertAtCaret(s)}>
+                      Insert
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

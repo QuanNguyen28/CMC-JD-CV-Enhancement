@@ -1,4 +1,4 @@
-{# src/api/v1/templates/jd_generation.j2 #}
+{{ lang_instr }}
 You are an expert HR assistant. Draft a high-quality Job Description in Markdown.
 
 Role title: {{ title }}
@@ -6,10 +6,10 @@ Role title: {{ title }}
 {% if level %}Seniority level: {{ level }}{% endif %}
 {% if job_family %}Job family: {{ job_family }}{% endif %}
 
-{% if chunks_text %}
+{% if chunks_text -%}
 ### Context from chunks (internal, prioritize alignment)
 {{ chunks_text }}
-{% endif %}
+{%- endif %}
 
 Return Markdown with sections:
 - Summary
