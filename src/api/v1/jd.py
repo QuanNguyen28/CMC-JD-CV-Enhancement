@@ -14,6 +14,15 @@ from src.services.export_bridge import export_jd_file
 
 from embeddings.utils.gemini_embed import embed_text
 from src.services.retriever_service import retrieve_with_snippet
+from fastapi.responses import StreamingResponse
+from src.schemas.jd_live import (
+    JDImproveRequest, JDImproveResponse,
+    JDSuggestRequest, JDSuggestResponse
+)
+from src.services.llm_prompt_orchestrator import (
+    improve_jd, suggest_jd_section, fake_streaming
+)
+from src.services.jd_versioning_service import record_jd_version
 
 router = APIRouter(prefix="/v1/jd", tags=["JD"])
 
@@ -169,3 +178,71 @@ def export_jd(
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+@router.post("/improve", response_model=JDImproveResponse)
+def improve_jd_endpoint(
+    req: JDImproveRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("recruiter", "admin"))
+):
+    """
+    Cải thiện toàn văn JD theo chỉ dẫn. Có thể lưu thành version mới nếu `create_new_version=True`.
+    """
+    try:
+        improved = improve_jd(req.content_md, req.instruction, req.language)
+        ver = None
+        if req.create_new_version:
+            # Cần jd_id để lưu; nếu client không gửi jd_id thì bỏ qua lưu version.
+            # Gợi ý: client gửi kèm jd_id trong query hoặc body nếu muốn lưu.
+            # Ở đây mình thử lấy jd_id từ phần header tạm (tuỳ bạn thay đổi).
+            jd_id = None
+            # Nếu muốn chuẩn, hãy thêm jd_id vào JDImproveRequest và dùng ở đây.
+            if jd_id:
+                ver = record_jd_version(
+                    db,
+                    jd_id=jd_id,
+                    content_md=improved,
+                    updated_by=current_user.username,
+                    change_summary="improve via /v1/jd/improve"
+                )
+        return JDImproveResponse(content_md=improved, version=ver)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Improve failed: {e}")
+
+@router.post("/suggest", response_model=JDSuggestResponse)
+def suggest_jd_endpoint(
+    req: JDSuggestRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("recruiter", "admin"))
+):
+    """
+    Gợi ý bullets/đoạn cho một section cụ thể.
+    Có thể truyền thêm chunks_text (đã ghép sẵn từ RAG) để LLM bám theo.
+    """
+    try:
+        out = suggest_jd_section(
+            content_md=req.content_md,
+            section=req.section or "",
+            goal=req.goal or "",
+            language=req.language or "vi",
+            chunks_text=req.chunks_text or "",
+        )
+        return JDSuggestResponse(suggestions=out["bullets"], rationale=out.get("rationale"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Suggest failed: {e}")
+
+@router.post("/improve/stream")
+def improve_stream(
+    req: JDImproveRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("recruiter", "admin"))
+):
+    """
+    SSE endpoint “giả streaming” (server chunk) để hiển thị live suggestion.
+    Client: fetch('/v1/jd/improve/stream', {method:'POST', body:..., headers:{'Accept':'text/event-stream'}})
+    """
+    try:
+        improved = improve_jd(req.content_md, req.instruction, req.language)
+        return StreamingResponse(fake_streaming(improved), media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Improve stream failed: {e}")

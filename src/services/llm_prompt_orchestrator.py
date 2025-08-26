@@ -3,7 +3,8 @@
 Builds and calls the LLM (Gemini) for JD generation & improvement, with optional RAG chunks.
 """
 import os
-from typing import Tuple, Dict, Any, List
+import time
+from typing import Tuple, Dict, Any, List, Generator
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
 from google import genai
@@ -96,16 +97,122 @@ def generate_jd_text(metadata: Dict[str, Any], db: Session) -> Tuple[str, int]:
     )
     return content_md, version
 
-def improve_jd_text(raw_text: str) -> str:
+# Live suggestion / Improve helpers 
+def improve_jd(content_md: str, instruction: str = "", language: str = "vi") -> str:
     """
-    Enhance an existing JD for clarity and completeness.
+    Cải thiện toàn văn JD theo instruction.
     """
-    try:
-        tmpl = env.get_template("jd_improvement.j2")
-        prompt = tmpl.render(raw=raw_text)
-    except Exception:
-        prompt = (
-            "Enhance this job description for clarity and completeness. "
-            "Return Markdown only.\n\n" + raw_text
-        )
+    sys = "You are an expert HR/Recruiting writer. Keep Markdown, keep factual info."
+    lang_hint = "Vietnamese" if language == "vi" else "English"
+    inst = instruction or "Improve clarity, consistency, and tone; keep Markdown; preserve facts."
+
+    prompt = f"""{sys}
+Language: {lang_hint}
+
+Instruction:
+{inst}
+
+--- Current JD (Markdown) ---
+{content_md}
+"""
     return _llm_generate(prompt)
+
+def suggest_jd_section(
+    content_md: str,
+    section: str = "",
+    goal: str = "",
+    language: str = "vi",
+    chunks_text: str = "",
+) -> Dict[str, Any]:
+    """
+    Gợi ý bullets/đoạn cho một section cụ thể, có thể tận dụng chunks_text (RAG).
+    """
+    sys = "You are an expert HR/Recruiting writer. Keep Markdown bullets concise."
+    lang_hint = "Vietnamese" if language == "vi" else "English"
+    sec = section or "Responsibilities"
+    g = goal or "Suggest 5-8 concise bullets aligned with the tone."
+
+    ctx = f"\n\n### Context (chunks)\n{chunks_text}\n" if chunks_text else ""
+
+    prompt = f"""{sys}
+Language: {lang_hint}
+
+Goal: {g}
+Target section: {sec}
+Return only a Markdown list (no intro text){',' if language=='en' else ''} each bullet ≤ 22 words.
+
+--- Current JD (Markdown) ---
+{content_md}
+{ctx}
+"""
+    text = _llm_generate(prompt)
+    # Chuẩn hoá ra list bullets
+    lines = [ln.strip("-• ").strip() for ln in text.splitlines() if ln.strip()]
+    bullets = [ln for ln in lines if ln and not ln.lower().startswith("#")]
+    return {"bullets": bullets[:12], "rationale": None}
+
+def fake_streaming(text: str, delay_sec: float = 0.05) -> Generator[str, None, None]:
+    """
+    Giả streaming SSE bằng cách cắt nhỏ text thành câu/đoạn và yield dần.
+    """
+    parts = [p for p in text.split("\n") if p is not None]
+    for p in parts:
+        yield f"data: {p}\n\n"
+        time.sleep(delay_sec)
+
+    lang_hint = "Vietnamese" if language == "vi" else "English"
+    inst = instruction or "Improve clarity, consistency, and tone; keep Markdown; preserve facts."
+
+    prompt = f"""{sys}
+Language: {lang_hint}
+
+Instruction:
+{inst}
+
+--- Current JD (Markdown) ---
+{content_md}
+"""
+    return _llm_generate(prompt)
+
+def suggest_jd_section(
+    content_md: str,
+    section: str = "",
+    goal: str = "",
+    language: str = "vi",
+    chunks_text: str = "",
+) -> Dict[str, Any]:
+    """
+    Gợi ý bullets/đoạn cho một section cụ thể, có thể tận dụng chunks_text (RAG).
+    """
+    sys = "You are an expert HR/Recruiting writer. Keep Markdown bullets concise."
+    lang_hint = "Vietnamese" if language == "vi" else "English"
+    sec = section or "Responsibilities"
+    g = goal or "Suggest 5-8 concise bullets aligned with the tone."
+
+    ctx = f"\n\n### Context (chunks)\n{chunks_text}\n" if chunks_text else ""
+
+    prompt = f"""{sys}
+Language: {lang_hint}
+
+Goal: {g}
+Target section: {sec}
+Return only a Markdown list (no intro text){',' if language=='en' else ''} each bullet ≤ 22 words.
+
+--- Current JD (Markdown) ---
+{content_md}
+{ctx}
+"""
+    text = _llm_generate(prompt)
+    # Chuẩn hoá ra list bullets
+    lines = [ln.strip("-• ").strip() for ln in text.splitlines() if ln.strip()]
+    bullets = [ln for ln in lines if ln and not ln.lower().startswith("#")]
+    return {"bullets": bullets[:12], "rationale": None}
+
+def fake_streaming(text: str, delay_sec: float = 0.05) -> Generator[str, None, None]:
+    """
+    Giả streaming SSE bằng cách cắt nhỏ text thành câu/đoạn và yield dần.
+    """
+    parts = [p for p in text.split("\n") if p is not None]
+    for p in parts:
+        yield f"data: {p}\n\n"
+        time.sleep(delay_sec)
