@@ -436,7 +436,7 @@ export default function ComposePage() {
           </button>
 
           {suggOpen && (
-            <div className="mt-3 grid md:grid-cols-2 gap-3 max-h-[260px] overflow-auto pr-1">
+            <div className="mt-3 grid md:grid-cols-2 gap-3 max-h-[320px] overflow-auto pr-1">
               {suggestions.length === 0 && !suggesting && (
                 <div className="text-sm text-[var(--muted)]">
                   Select a mode and click <b>Generate</b> to receive contextual suggestions based on the current content.
@@ -445,9 +445,9 @@ export default function ComposePage() {
               {suggestions.map((s, idx) => (
                 <div
                   key={`${idx}-${s.slice(0, 16)}`}
-                  className="p-3 rounded-xl border border-[var(--ring)] bg-white/90 dark:bg-white/5 hover:shadow-sm transition"
+                  className="neo-soft p-3 hover:shadow-sm transition text-[var(--fg)]"
                 >
-                  <pre className="whitespace-pre-wrap text-sm">{s}</pre>
+                  <pre className="whitespace-pre-wrap text-sm text-[var(--fg)]">{s}</pre>
                   <div className="text-right mt-2">
                     <button className="btn" onClick={() => insertAtCaret(s)}>
                       Insert
